@@ -1,0 +1,49 @@
+name: Update SATS-JSON game data
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */1 * * *'
+
+jobs:
+  sats-json:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Checkout game data repo
+      uses: actions/checkout@v4
+      with:
+        repository: BitCraftToolBox/BitCraft_GameData
+        ref: sats-json
+        path: workspace/data/sats-json
+        token: ${{ secrets.ACTIONS_TOKEN }}
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+    - name: Install dependencies
+      run: pip install -r scripts/sats-json/requirements.txt
+    - name: Remove old data
+      run: rm -rf workspace/data/sats-json/*
+      shell: bash
+    - name: Run data script
+      id: update-data
+      env:
+        BITCRAFT_SPACETIME_HOST: ${{ secrets.BITCRAFT_SPACETIME_HOST }}
+        BITCRAFT_BEARER_TOKEN: ${{ secrets.BITCRAFT_BEARER_TOKEN }}
+        DATA_DIR: ./workspace/data/sats-json
+      run: python scripts/sats-json/gamedata-sats-json.py
+    - name: Commit changes
+      if: steps.update-data.outputs.updated_data == 'true'
+      run: |
+        cd workspace/data/sats-json
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add -A
+        if ! git diff --cached --quiet; then
+          git commit -m "Update game data: $(date +%Y-%m-%d)"
+          git push origin sats-json
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}

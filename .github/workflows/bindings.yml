@@ -1,0 +1,108 @@
+name: Update SpacetimeDB Bindings
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */1 * * *'
+
+jobs:
+  generate-bindings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch schemas
+        run: scripts/generate-bindings/get-schema.sh
+        env:
+          BITCRAFT_SPACETIME_HOST: ${{ secrets.BITCRAFT_SPACETIME_HOST }}
+          DATA_DIR: ${{ github.workspace }}/workspace/bindings
+      - name: Check schema changes
+        id: check-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            workspace/bindings/global_schema.json
+            workspace/bindings/region_schema.json
+          key: schemas-${{ hashFiles('workspace/bindings/global_schema.json', 'workspace/bindings/region_schema.json') }}
+      - uses: actions/checkout@v4
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        with:
+          repository: BitCraftToolBox/BitCraft_Bindings
+          path: workspace/bindings/cs/global
+          ref: cs-global
+          token: ${{ secrets.ACTIONS_TOKEN }}
+      - uses: actions/checkout@v4
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        with:
+          repository: BitCraftToolBox/BitCraft_Bindings
+          path: workspace/bindings/cs/region
+          ref: cs-region
+          token: ${{ secrets.ACTIONS_TOKEN }}
+      - uses: actions/checkout@v4
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        with:
+          repository: BitCraftToolBox/BitCraft_Bindings
+          path: workspace/bindings/ts/global
+          ref: ts-global
+          token: ${{ secrets.ACTIONS_TOKEN }}
+      - uses: actions/checkout@v4
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        with:
+          repository: BitCraftToolBox/BitCraft_Bindings
+          path: workspace/bindings/ts/region
+          ref: ts-region
+          token: ${{ secrets.ACTIONS_TOKEN }}
+      - uses: actions/checkout@v4
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        with:
+          repository: BitCraftToolBox/BitCraft_Bindings
+          path: workspace/bindings/rs/global
+          ref: rs-global
+          token: ${{ secrets.ACTIONS_TOKEN }}
+      - uses: actions/checkout@v4
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        with:
+          repository: BitCraftToolBox/BitCraft_Bindings
+          path: workspace/bindings/rs/region
+          ref: rs-region
+          token: ${{ secrets.ACTIONS_TOKEN }}
+      - name: Remove old data
+        run: rm -rf workspace/bindings/{cs,rs,ts}/{global,region}/*
+        shell: bash
+      - name: Generate bindings
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL https://install.spacetimedb.com | sh -s -- --yes
+          scripts/generate-bindings/make-bindings.sh
+        env:
+          DATA_DIR: ${{ github.workspace }}/workspace/bindings
+      - name: Push changes
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
+        run: |
+          for lang in cs rs ts; do
+            for module in global region; do
+              cd workspace/bindings/$lang/$module
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git add -A
+              if ! git diff --cached --quiet; then
+                git commit -m "Update bindings: $(date +%Y-%m-%d)"
+                git push origin $lang-$module
+              fi
+              cd ../../../../
+            done
+          done
+      - name: Update bindings for BSATN/Cereal scripts
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git submodule update --remote
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Update bindings"
+            git push origin
+          fi

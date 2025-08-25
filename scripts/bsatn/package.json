@@ -1,0 +1,18 @@
+{
+  "name": "automata-bsatn",
+  "version": "0.1.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@clockworklabs/spacetimedb-sdk": "^1.3.1",
+    "dotenv": "^17.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.4",
+    "typescript": "^5.5.3"
+  },
+  "private": true
+}

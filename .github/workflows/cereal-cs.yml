@@ -1,0 +1,48 @@
+name: Update C# SDK serialized game data
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '5 */1 * * *'
+
+jobs:
+  cereal-cs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Checkout game data repo
+        uses: actions/checkout@v4
+        with:
+          repository: BitCraftToolBox/BitCraft_GameData
+          ref: cereal/cs
+          path: workspace/data/cereal-cs
+          token: ${{ secrets.ACTIONS_TOKEN }}
+      - name: Set up DotNet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+      - name: Remove old data
+        run: rm -rf workspace/data/cereal-cs/*
+      - name: Run data script
+        id: update-data
+        env:
+          BITCRAFT_SPACETIME_HOST: ${{ secrets.BITCRAFT_SPACETIME_HOST }}
+          BITCRAFT_BEARER_TOKEN: ${{ secrets.BITCRAFT_BEARER_TOKEN }}
+          DATA_DIR: ${{ github.workspace }}/workspace/data/cereal-cs/static
+        run: dotnet run --project cereal-cs.csproj
+        working-directory: scripts/cereal-cs
+      - name: Commit changes
+        if: steps.update-data.outputs.updated_data == 'true'
+        run: |
+          cd workspace/data/cereal-cs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Update game data: $(date +%Y-%m-%d)"
+            git push origin cereal/cs
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}

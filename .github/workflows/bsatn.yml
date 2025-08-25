@@ -1,0 +1,51 @@
+name: Update BSATN game data
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '5 */1 * * *'
+
+jobs:
+  bsatn:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+    - name: Checkout game data repo
+      uses: actions/checkout@v4
+      with:
+        repository: BitCraftToolBox/BitCraft_BSATN_Data
+        path: workspace/data/bsatn
+        token: ${{ secrets.ACTIONS_TOKEN }}
+    - name: Set up Nodejs
+      uses: actions/setup-node@v4
+      with:
+        cache: 'npm'
+        cache-dependency-path: 'scripts/bsatn/'
+    - name: Install dependencies
+      run: npm ci
+      working-directory: scripts/bsatn
+    - name: Remove old data
+      run: rm -rf workspace/data/bsatn/server/*
+    - name: Run data script
+      id: update-data
+      env:
+        BITCRAFT_SPACETIME_HOST: ${{ secrets.BITCRAFT_SPACETIME_HOST }}
+        BITCRAFT_BEARER_TOKEN: ${{ secrets.BITCRAFT_BEARER_TOKEN }}
+        DATA_DIR: ${{ github.workspace }}/workspace/data/bsatn
+      run: npm exec tsx gamedata-bsatn.ts
+      working-directory: scripts/bsatn
+    - name: Commit changes
+      if: steps.update-data.outputs.updated_data == 'true'
+      run: |
+        cd workspace/data/bsatn
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add -A
+        if ! git diff --cached --quiet; then
+          git commit -m "Update game data: $(date +%Y-%m-%d)"
+          git push origin main
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}

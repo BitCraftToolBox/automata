@@ -1,0 +1,13 @@
+diff --git a/src/index.ts b/src/index.ts
+index 33d5af3..cf0aa24 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -3012,7 +3012,7 @@ export { WorldRegionNameState };
+ import { WorldRegionState } from "./world_region_state_type.ts";
+ export { WorldRegionState };
+ 
+-const REMOTE_MODULE = {
++export const REMOTE_MODULE = {
+   tables: {
+     a_i_debug_state: {
+       tableName: "a_i_debug_state",
