@@ -25,6 +25,23 @@ jobs:
       - uses: actions/checkout@v4
         if: steps.check-cache.outputs.cache-hit != 'true'
         with:
+          repository: BitCraftToolBox/BitCraft_GameData
+          path: workspace/bindings/schema
+          ref: schema
+          token: ${{ secrets.ACTIONS_TOKEN }}
+      - if: steps.check-cache.outputs.cache-hit != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
+        run: |
+          cd workspace/bindings/schema
+          cp ../global_schema.json ../region_schema.json .
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Update schema: $(date +%Y-%m-%d)"
+          git push origin schema
+      - uses: actions/checkout@v4
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        with:
           repository: BitCraftToolBox/BitCraft_Bindings
           path: workspace/bindings/cs/global
           ref: cs-global
