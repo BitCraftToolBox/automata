@@ -2,7 +2,7 @@ name: Update SATS-JSON game data
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */1 * * *'
+    - cron: '37 * * * *'
 
 jobs:
   sats-json:

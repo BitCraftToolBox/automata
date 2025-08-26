@@ -2,7 +2,7 @@ name: Update SpacetimeDB Bindings
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */1 * * *'
+    - cron: '37 * * * *'
 
 jobs:
   generate-bindings:

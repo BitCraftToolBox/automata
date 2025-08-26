@@ -2,7 +2,7 @@ name: Update BSATN game data
 on:
   workflow_dispatch:
   schedule:
-    - cron: '5 */1 * * *'
+    - cron: '42 * * * *'
 
 jobs:
   bsatn:
