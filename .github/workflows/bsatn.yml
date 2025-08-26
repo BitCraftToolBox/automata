@@ -27,13 +27,13 @@ jobs:
       run: npm ci
       working-directory: scripts/bsatn
     - name: Remove old data
-      run: rm -rf workspace/data/bsatn/server/*
+      run: rm -rf workspace/data/bsatn/static/*
     - name: Run data script
       id: update-data
       env:
         BITCRAFT_SPACETIME_HOST: ${{ secrets.BITCRAFT_SPACETIME_HOST }}
         BITCRAFT_BEARER_TOKEN: ${{ secrets.BITCRAFT_BEARER_TOKEN }}
-        DATA_DIR: ${{ github.workspace }}/workspace/data/bsatn
+        DATA_DIR: ${{ github.workspace }}/workspace/data/bsatn/static
       run: npm exec tsx gamedata-bsatn.ts
       working-directory: scripts/bsatn
     - name: Commit changes

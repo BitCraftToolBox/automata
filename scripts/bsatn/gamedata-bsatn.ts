@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 
 fs.existsSync('../../.env.local') && require('dotenv').config({path: '../../.env.local'});
 
-const data_dir = process.env.DATA_DIR || "../../workspace/data/bsatn/server";
+const data_dir = process.env.DATA_DIR || "../../workspace/data/bsatn/static";
 
 !fs.existsSync(data_dir) && fs.mkdirSync(data_dir, {recursive: true});
 
