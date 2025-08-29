@@ -82,6 +82,7 @@ jobs:
           ref: rs-region
           token: ${{ secrets.ACTIONS_TOKEN }}
       - name: Remove old data
+        if: steps.check-cache.outputs.cache-hit != 'true'
         run: rm -rf workspace/bindings/{cs,rs,ts}/{global,region}/*
         shell: bash
       - name: Generate bindings
