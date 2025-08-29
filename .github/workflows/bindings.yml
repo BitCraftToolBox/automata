@@ -34,7 +34,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
         run: |
           cd workspace/bindings/schema
-          cp ../global_schema.json ../region_schema.json .
+          jq . ../global_schema.json > global_schema.json
+          jq . ../region_schema.json > region_schema.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -am "Update schema: $(date +%Y-%m-%d)"
