@@ -165,7 +165,7 @@ void OnSubscriptionApplied(SubscriptionEventContext ctx, string[] tables, string
         var getIterMethod = ReflectIterator(tblHandle);
         var tblIter = getIterMethod.Invoke(tblHandle, [])!;
 
-        var array = JArray.FromObject(tblIter);
+        var array = JArray.FromObject(tblIter, JsonSerializer.CreateDefault(new JsonSerializerSettings { Converters = [converters] }));
 
         if (array.Count > 0)
         {
@@ -179,7 +179,7 @@ void OnSubscriptionApplied(SubscriptionEventContext ctx, string[] tables, string
             }
         }
 
-        File.WriteAllText($"{dataDir}/{table}.json", JsonConvert.SerializeObject(array, Formatting.Indented, converters));
+        File.WriteAllText($"{dataDir}/{table}.json", JsonConvert.SerializeObject(array, Formatting.Indented));
     }
 
     ctx.Disconnect();
