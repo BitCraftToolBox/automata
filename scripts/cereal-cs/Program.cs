@@ -22,6 +22,7 @@ async Task Main()
 {
     // Get environment variables
     var host = Environment.GetEnvironmentVariable("BITCRAFT_SPACETIME_HOST");
+    var region = Environment.GetEnvironmentVariable("BITCRAFT_REGION") ?? "bitcraft-2";
     var token = Environment.GetEnvironmentVariable("BITCRAFT_BEARER_TOKEN");
     var dataDir = Environment.GetEnvironmentVariable("DATA_DIR") ?? "workspace/data/cereal-cs";
     Directory.CreateDirectory(dataDir);
@@ -31,11 +32,11 @@ async Task Main()
         throw new Exception("Missing required environment variable BITCRAFT_SPACETIME_HOST.");
     }
 
-    var tables = await GetStaticTableNames(host, "bitcraft-2");
+    var tables = await GetStaticTableNames(host, region);
 
     DbConnection? conn = null;
     var cancellationTokenSource = new CancellationTokenSource();
-    conn = ConnectToDatabase(cancellationTokenSource, host, token, tables, dataDir);
+    conn = ConnectToDatabase(cancellationTokenSource, host, region, token, tables, dataDir);
     var thread = new Thread(() => ProcessThread(conn, cancellationTokenSource.Token));
     thread.Start();
     thread.Join();
@@ -96,12 +97,12 @@ async Task<string[]> GetStaticTableNames(string host, string module)
     return tables;
 }
 
-DbConnection ConnectToDatabase(CancellationTokenSource token, string host, string? bearerToken, string[] tables, string dataDir)
+DbConnection ConnectToDatabase(CancellationTokenSource token, string host, string region, string? bearerToken, string[] tables, string dataDir)
 {
     DbConnection? conn = null;
     conn = DbConnection.Builder()
         .WithUri("https://" + host)
-        .WithModuleName("bitcraft-2")
+        .WithModuleName(region)
         .WithToken(bearerToken)
         .OnConnect((c, _, _) => OnConnected(c, tables, dataDir))
         .OnConnectError(OnConnectError)
@@ -154,6 +155,8 @@ MethodInfo ReflectIterator(object handle)
 void OnSubscriptionApplied(SubscriptionEventContext ctx, string[] tables, string dataDir)
 {
     var converters = new StringEnumConverter();
+    var sortKeys = new[] { "id", "item_id", "building_id", "name", "cargo_id", "type_id" };
+
 
     var getTableMethod = ReflectTables(ctx.Db);
     foreach (var table in tables)
@@ -161,7 +164,22 @@ void OnSubscriptionApplied(SubscriptionEventContext ctx, string[] tables, string
         var tblHandle = getTableMethod.Invoke(ctx.Db, [table])!;
         var getIterMethod = ReflectIterator(tblHandle);
         var tblIter = getIterMethod.Invoke(tblHandle, [])!;
-        File.WriteAllText($"{dataDir}/{table}.json", JsonConvert.SerializeObject(tblIter, Formatting.Indented, converters));
+
+        var array = JArray.FromObject(tblIter);
+
+        if (array.Count > 0)
+        {
+            // Find the first key that exists in the objects
+            var sortKey = sortKeys.FirstOrDefault(key => array[0][key] != null);
+
+            if (sortKey != null)
+            {
+                var sorted = array.OrderBy(item => item[sortKey]?.ToObject<object>());
+                array = new JArray(sorted);
+            }
+        }
+
+        File.WriteAllText($"{dataDir}/{table}.json", JsonConvert.SerializeObject(array, Formatting.Indented, converters));
     }
 
     ctx.Disconnect();
