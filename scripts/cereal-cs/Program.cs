@@ -91,7 +91,7 @@ async Task<string[]> GetStaticTableNames(string host, string module)
         .Select(t => (string) t["name"])
         .Where(name => !string.IsNullOrEmpty(name))
         .Where(name => !name.EndsWith("_state"))
-        .Where(name => name.EndsWith("_desc") || Array.IndexOf(extraTables, name) > -1)
+        .Where(name => name.EndsWith("_desc") || name.EndsWith("_desc_v2") || Array.IndexOf(extraTables, name) > -1)
         .ToArray();
 
     return tables;

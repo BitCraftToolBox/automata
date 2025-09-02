@@ -43,7 +43,7 @@ function isStaticTable(tbl: { name: string; table_access: Record<'Public' | 'Pri
         return false;
     }
     const name = tbl.name;
-    if (name.endsWith('_desc')) {
+    if (name.endsWith('_desc') || name.endsWith('_desc_v2')) {
         return true;
     }
     if (name.endsWith('_state')) {

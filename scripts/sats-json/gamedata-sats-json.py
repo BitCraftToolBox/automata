@@ -82,7 +82,8 @@ def _is_static_table(tbl):
     if 'Public' not in tbl['table_access']:
         return False
     name = tbl['name']
-    if name.endswith('_desc'):
+    # TODO prob needs re
+    if name.endswith('_desc') or name.endswith('_desc_v2'):
         return True
     if name.endswith('_state'):
         return False
