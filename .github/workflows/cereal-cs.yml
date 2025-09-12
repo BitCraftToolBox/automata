@@ -10,8 +10,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: true
+      - name: Update bindings
+        run:
+          git submodule update --init --remote scripts/cereal-cs/bindings
       - name: Checkout game data repo
         uses: actions/checkout@v4
         with:
