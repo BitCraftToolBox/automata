@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
 using BitCraftRegion.Types;
 using dotenv.net;
 using Newtonsoft.Json;
@@ -85,13 +86,14 @@ async Task<string[]> GetStaticTableNames(string host, string module)
         throw new Exception("Invalid schema format: tables wasn't a list of dictionaries.");
     }
 
+    var descRegex = new Regex("_desc(_v\\d+)?$");
     var extraTables = new[] { "claim_tile_cost" };
     var tables = schemaTables
         .Where(t => ((JObject) t["table_access"]).ContainsKey("Public"))
         .Select(t => (string) t["name"])
         .Where(name => !string.IsNullOrEmpty(name))
         .Where(name => !name.EndsWith("_state"))
-        .Where(name => name.EndsWith("_desc") || name.EndsWith("_desc_v2") || Array.IndexOf(extraTables, name) > -1)
+        .Where(name => descRegex.IsMatch(name) || Array.IndexOf(extraTables, name) > -1)
         .ToArray();
 
     return tables;

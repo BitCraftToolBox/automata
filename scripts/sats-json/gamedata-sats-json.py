@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import uuid
 from pathlib import Path
 
@@ -78,12 +79,14 @@ def get_schema(hostname):
     return schema_glb, schema_reg
 
 
+_desc_re = re.compile(r"_desc(_v\d+)?$")
+
+
 def _is_static_table(tbl):
     if 'Public' not in tbl['table_access']:
         return False
     name = tbl['name']
-    # TODO prob needs re
-    if name.endswith('_desc') or name.endswith('_desc_v2'):
+    if _desc_re.match(name):
         return True
     if name.endswith('_state'):
         return False
