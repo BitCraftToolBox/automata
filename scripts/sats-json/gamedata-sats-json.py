@@ -79,7 +79,7 @@ def get_schema(hostname):
     return schema_glb, schema_reg
 
 
-_desc_re = re.compile(r"_desc(_v\d+)?$")
+_desc_re = re.compile(r".+_desc(_v\d+)?$")
 
 
 def _is_static_table(tbl):
