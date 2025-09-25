@@ -90,6 +90,8 @@ jobs:
         if: steps.check-cache.outputs.cache-hit != 'true'
         run: |
           curl -fsSL https://install.spacetimedb.com | sh -s -- --yes
+          spacetime version install 1.3.2
+          spacetime version use 1.3.2
           scripts/generate-bindings/make-bindings.sh
         env:
           DATA_DIR: ${{ github.workspace }}/workspace/bindings
