@@ -1,0 +1,9 @@
+name: Extract BitCraft assets
+on:
+  workflow_dispatch:
+
+jobs:
+  extract-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ""
