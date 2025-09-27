@@ -1,0 +1,48 @@
+name: Extract BitCraft assets
+on:
+  workflow_dispatch:
+  #schedule:
+  #  - cron: '37 5 * * *'
+
+jobs:
+  extract-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download DepotDownloader
+        run: |
+          mkdir -p workspace/assets
+          cd workspace/assets
+          wget -qO DepotDownloader.zip https://github.com/SteamRE/DepotDownloader/releases/download/DepotDownloader_3.4.0/DepotDownloader-linux-x64.zip
+          unzip DepotDownloader.zip DepotDownloader
+      - name: Steam auth cache
+        id: auth-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/IsolatedStorage
+          key: steamauth-${{ hashFiles('~/.local/share/IsolatedStorage/**/account.config') }}
+      - name: Steam auth
+        if: steps.auth-cache.outputs.cache-hit != 'true'
+        working-directory: workspace/assets
+        run: |
+          ./DepotDownloader -app 3454650 -qr -remember-password -os windows -branch preview -manifest-only
+      - name: Check depot manifest
+        working-directory: workspace/assets
+        env:
+          STEAM_USER: ${{ secrets.STEAM_USER }}
+        run: |
+          ./DepotDownloader -app 3454650 -username $STEAM_USER -remember-password -os windows -branch preview -manifest-only \
+          | grep Manifest | cut -d " " -f 2 > manifest.txt
+      - name: Cache depot manifest
+        id: manifest-cache
+        uses: actions/cache@v4
+        with:
+          path: workspace/assets/manifest.txt
+          key: ${{ hashFiles('workspace/assets/manifest.txt') }}
+      - name: Download depot
+        if: steps.manifest-cache.outputs.cache-hit != 'true'
+        working-directory: workspace/assets
+        env:
+          STEAM_USER: ${{ secrets.STEAM_USER }}
+        run: |
+          ./DepotDownloader -app 3454650 -username $STEAM_USER -remember-password -os windows -branch preview
