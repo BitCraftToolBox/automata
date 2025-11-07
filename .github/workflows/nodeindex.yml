@@ -1,13 +1,93 @@
 name: Update nodeindex
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '37 * * * *'
 
 jobs:
   build-cacheless-bindings:
     runs-on: ubuntu-latest
+    outputs:
+      cache-hit: ${{ steps.check-cache.outputs.cache-hit }}
     steps:
-      - run: echo ""
+      - uses: actions/checkout@v4
+      - name: Fetch schemas
+        run: scripts/generate-bindings/get-schema.sh
+        env:
+          BITCRAFT_SPACETIME_HOST: ${{ secrets.BITCRAFT_SPACETIME_HOST }}
+          DATA_DIR: ${{ github.workspace }}/workspace/bindings
+      - name: Check schema changes
+        id: check-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            workspace/bindings/global_schema.json
+            workspace/bindings/region_schema.json
+          key: schemas-nodeindex-${{ hashFiles('workspace/bindings/global_schema.json', 'workspace/bindings/region_schema.json') }}
+      - uses: actions/checkout@v4
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        with:
+          repository: BitCraftToolBox/cacheless-rust-bindings
+          path: workspace/bindings/cacheless
+          ref: main
+          token: ${{ secrets.ACTIONS_TOKEN }}
+      - name: Generate bindings
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL https://install.spacetimedb.com | sh -s -- --yes
+          spacetime version install 1.4.0
+          spacetime version use 1.4.0
+          ./generate.sh
+        working-directory: ${{ github.workspace }}/workspace/bindings/cacheless
+      - name: Push changes
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
+        run: |
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            if ! git diff --cached --quiet; then
+              git commit -m "Update bindings: $(date +%Y-%m-%d)"
+              git push origin
+            fi
+        working-directory: ${{ github.workspace }}/workspace/bindings/cacheless
   build-nodeindex:
+    needs: build-cacheless-bindings
+    if: ${{ needs.build-cacheless-bindings.outputs.cache-hit != 'true' }}
     runs-on: ubuntu-latest
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: bitcrafttoolbox/bitcraftmap-api
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
     steps:
-      - run: echo ""
+      - name: Checkout nodeindex
+        uses: actions/checkout@v4
+        with:
+          repository: BitCraftToolBox/bitcraft-nodeindex
+          path: workspace/nodeindex
+          ref: main
+          token: ${{ secrets.ACTIONS_TOKEN }}
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: BitCraftToolBox
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push image
+        id: push
+        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+        with:
+          context: workspace/nodeindex
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}:latest
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
