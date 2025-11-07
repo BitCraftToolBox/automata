@@ -1,0 +1,13 @@
+name: Update nodeindex
+on:
+  workflow_dispatch:
+
+jobs:
+  build-cacheless-bindings:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ""
+  build-nodeindex:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ""
