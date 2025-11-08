@@ -72,12 +72,26 @@ jobs:
           path: workspace/nodeindex
           ref: main
           token: ${{ secrets.ACTIONS_TOKEN }}
+      - name: Update binding repo
+        run: |
+          cargo update bindings
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Update bindings: $(date +%Y-%m-%d)"
+            git push origin
+          fi
+        working-directory: ${{ github.workspace }}/workspace/nodeindex
       - name: Log in to the Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
         with:
           registry: ${{ env.REGISTRY }}
           username: BitCraftToolBox
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Build and push image
         id: push
         uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
@@ -85,9 +99,6 @@ jobs:
           context: workspace/nodeindex
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}:latest
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v3
-        with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
-          subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
