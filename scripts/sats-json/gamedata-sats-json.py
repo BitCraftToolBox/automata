@@ -63,6 +63,7 @@ def table_names_to_file(schema, table_file):
     public = [k for k, v in tables.items() if v]
     private = [k for k, v in tables.items() if not v]
     rls = schema.get("row_level_security", [])
+    rls.sort(key=lambda x: x['sql'])
     with open(table_file, 'w') as f:
         json.dump(dict(public=public, private=private, row_level_security=rls), fp=f, indent=2)
 
