@@ -1,0 +1,13 @@
+{
+  "item_desc": "icon_asset_name",
+  "building_desc": "icon_asset_name",
+  "cargo_desc": "icon_asset_name",
+  "collectible_desc": "icon_asset_name",
+  "enemy_desc": "icon_address",
+  "hexite_exchange_entry_desc": "image_address",
+  "paving_tile_desc": "icon_address",
+  "pillar_shaping_desc": "icon_address",
+  "premium_item_desc": "image_address",
+  "premium_service_desc": "image_address",
+  "resource_desc": "icon_asset_name"
+}

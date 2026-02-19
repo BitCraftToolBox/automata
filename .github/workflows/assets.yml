@@ -20,12 +20,18 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.local/share/IsolatedStorage
-          key: steamauth-${{ hashFiles('~/.local/share/IsolatedStorage/**/account.config') }}
+          key: steamauth-
       - name: Steam auth
         if: steps.auth-cache.outputs.cache-hit != 'true'
         working-directory: workspace/assets
         run: |
           ./DepotDownloader -app 3454650 -qr -remember-password -os windows -branch preview -manifest-only
+      - uses: actions/cache/save@v5
+        if: steps.auth-cache.outputs.cache-hit != 'true'
+        id: save-auth-cache
+        with:
+          path: ~/.local/share/IsolatedStorage
+          key: steamauth-
       - name: Check depot manifest
         working-directory: workspace/assets
         env:
@@ -46,3 +52,47 @@ jobs:
           STEAM_USER: ${{ secrets.STEAM_USER }}
         run: |
           ./DepotDownloader -app 3454650 -username $STEAM_USER -remember-password -os windows -branch preview
+      - name: Checkout game data repo
+        uses: actions/checkout@v4
+        with:
+          repository: BitCraftToolBox/BitCraft_GameData
+          ref: cereal/cs
+          path: workspace/assets/game-data
+      - name: Checkout game assets
+        uses: actions/checkout@v4
+        with:
+          repository: BitCraftToolBox/BitCraft_Assets
+          path: workspace/assets/publish
+          token: ${{ secrets.ACTIONS_TOKEN }}
+      - name: Download AssetRipper
+        if: steps.manifest-cache.outputs.cache-hit != 'true'
+        working-directory: workspace/assets
+        run: |
+          wget -qO AssetRipper.zip https://github.com/AssetRipper/AssetRipper/releases/latest/download/AssetRipper_linux_x64.zip
+          unzip AssetRipper.zip
+      - name: Extract and catalog assets
+        if: steps.manifest-cache.outputs.cache-hit != 'true'
+        working-directory: workspace/assets
+        run: |
+          node ../../scripts/assets/unity-asset-ripper.js
+          npm exec tsx ../../scripts/assets/read-asset-catalog.ts
+      - name: Convert required assets
+        if: steps.manifest-cache.outputs.cache-hit != 'true'
+        working-directory: workspace/assets
+        run: |
+          cp ../../scripts/assets/wanted_sprites.json .
+          chmod +x ../../scripts/assets/map_and_convert_assets.sh
+          ../../scripts/assets/map_and_convert_assets.sh
+      - name: Commit and push assets
+        if: steps.manifest-cache.outputs.cache-hit != 'true'
+        working-directory: workspace/assets/publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Update assets: $(date +%Y-%m-%d)"
+            git push origin
+          fi
