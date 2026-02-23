@@ -1,8 +1,8 @@
 name: Extract BitCraft assets
 on:
   workflow_dispatch:
-  #schedule:
-  #  - cron: '37 5 * * *'
+  schedule:
+    - cron: '37 5 * * *'
 
 jobs:
   extract-assets:
