@@ -5,10 +5,11 @@ import * as path from "path";
 
 const workspaceDir = path.resolve(__dirname, '../../workspace/assets');
 const assetFolderPath = path.join(workspaceDir, 'depots/3454651');
-const build = fs.readdirSync(assetFolderPath, { recursive: false })[0];
-const catalog = path.join(assetFolderPath, String(build), 'BitCraft_Data', 'StreamingAssets', 'aa', 'catalog.json');
+const build = String(fs.readdirSync(assetFolderPath, { recursive: false })[0]);
+const catalog = path.join(assetFolderPath, build, 'BitCraft_Data', 'StreamingAssets', 'aa', 'catalog.json');
 
 const outputFile = "sprites.json";
+fs.writeFileSync(path.join(workspaceDir, 'publish/build'), build);
 
 class Reader {
   buf: Buffer;
