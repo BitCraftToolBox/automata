@@ -74,9 +74,9 @@ def download_schema(host, module):
     return res.json() if res.status_code == 200 else None
 
 
-def get_schema(hostname):
-    schema_glb = download_schema(hostname, 'bitcraft-global')
-    schema_reg = download_schema(hostname, 'bitcraft-2')
+def get_schema(hostname, global_mod, region_mod):
+    schema_glb = download_schema(hostname, global_mod)
+    schema_reg = download_schema(hostname, region_mod)
     return schema_glb, schema_reg
 
 
@@ -114,10 +114,12 @@ def main():
     stdb_host = os.getenv('BITCRAFT_SPACETIME_HOST')
     if not stdb_host:
         raise ValueError('BITCRAFT_SPACETIME_HOST not set')
+    global_mod = os.getenv('BITCRAFT_GLOBAL_MODULE') or 'bitcraft-global'
+    region_mod = os.getenv('BITCRAFT_REGION_MODULE') or 'bitcraft-2'
     auth = os.getenv('BITCRAFT_BEARER_TOKEN') or None
     auth = ('Bearer ' + auth) if auth else None
 
-    schema_glb, schema_reg = get_schema(stdb_host)
+    schema_glb, schema_reg = get_schema(stdb_host, global_mod, region_mod)
     table_names_to_file(schema_glb, data_dir / 'global_tables.json')
     table_names_to_file(schema_reg, data_dir / 'region_tables.json')
 

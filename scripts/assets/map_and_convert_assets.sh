@@ -54,3 +54,10 @@ echo "$ASSET_MAP" | jq -r 'to_entries[] | "\(.key) \(.value)"' | while read -r A
         echo "File not found: $FULL_PATH"
     fi
 done
+
+# Step 4: Copy other assets that don't need mapping and conversion
+# (so far just I18N)
+mkdir -p "$CONVERTED_DIR/I18N"
+for f in "$EXTRACTED_DIR"/Assets/_Project/StaticAssets/_AddressedAssets/I18N/*.bytes; do
+    cp -- "$f" "$CONVERTED_DIR/I18N/${f%.bytes}.csv"
+done

@@ -78,7 +78,7 @@ const createOnConnect = (subscriptions: string[], mappings: Map<KeyPair, Algebra
 
 
 async function main() {
-    let module = 'bitcraft-2';
+    let module = process.env.BITCRAFT_REGION_MODULE || 'bitcraft-2';
     const schema: SchemaResponse = await downloadSchema(process.env.BITCRAFT_SPACETIME_HOST, module);
 
     const subscriptions: string[] = [];

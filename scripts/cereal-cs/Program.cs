@@ -23,7 +23,7 @@ async Task Main()
 {
     // Get environment variables
     var host = Environment.GetEnvironmentVariable("BITCRAFT_SPACETIME_HOST");
-    var region = Environment.GetEnvironmentVariable("BITCRAFT_REGION") ?? "bitcraft-2";
+    var region = Environment.GetEnvironmentVariable("BITCRAFT_REGION_MODULE") ?? "bitcraft-2";
     var token = Environment.GetEnvironmentVariable("BITCRAFT_BEARER_TOKEN");
     var dataDir = Environment.GetEnvironmentVariable("DATA_DIR") ?? "workspace/data/cereal-cs";
     Directory.CreateDirectory(dataDir);

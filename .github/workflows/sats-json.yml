@@ -31,6 +31,8 @@ jobs:
       id: update-data
       env:
         BITCRAFT_SPACETIME_HOST: ${{ secrets.BITCRAFT_SPACETIME_HOST }}
+        BITCRAFT_GLOBAL_MODULE: ${{ secrets.BITCRAFT_GLOBAL_MODULE }}
+        BITCRAFT_REGION_MODULE: ${{ secrets.BITCRAFT_REGION_MODULE }}
         BITCRAFT_BEARER_TOKEN: ${{ secrets.BITCRAFT_BEARER_TOKEN }}
         DATA_DIR: ./workspace/data/sats-json
       run: python scripts/sats-json/gamedata-sats-json.py
