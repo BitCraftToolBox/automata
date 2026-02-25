@@ -129,7 +129,8 @@ def main():
     static_dir.mkdir(parents=True, exist_ok=True)
 
     # would like to get the static data from the global db, but it has a few empty tables
-    static_data = get_tables(stdb_host, 'bitcraft-2', static_tables, auth)
+    # update 2026-02-24: still missing a bunch https://i.imgur.com/fGnZHqk.png
+    static_data = get_tables(stdb_host, region_mod, static_tables, auth)
     save_tables(static_dir, static_data)
 
 
