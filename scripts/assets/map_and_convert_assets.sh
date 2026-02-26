@@ -57,7 +57,8 @@ done
 
 # Step 4: Copy other assets that don't need mapping and conversion
 # (so far just I18N)
-mkdir -p "$CONVERTED_DIR/I18N"
+mkdir -p "publish/I18N"
 for f in "$EXTRACTED_DIR"/Assets/_Project/StaticAssets/_AddressedAssets/I18N/*.bytes; do
-    cp -- "$f" "$CONVERTED_DIR/I18N/${f%.bytes}.csv"
+    name="$(basename "$f")"
+    cp -- "$f" "publish/I18N/${name%.bytes}.csv"
 done
