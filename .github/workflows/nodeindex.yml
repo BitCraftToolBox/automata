@@ -37,8 +37,8 @@ jobs:
         if: steps.check-cache.outputs.cache-hit != 'true'
         run: |
           curl -fsSL https://install.spacetimedb.com | sh -s -- --yes
-          spacetime version install 1.4.0
-          spacetime version use 1.4.0
+          spacetime version install 1.12.0
+          spacetime version use 1.12.0
           ./generate.sh
         working-directory: ${{ github.workspace }}/workspace/bindings/cacheless
       - name: Push changes
