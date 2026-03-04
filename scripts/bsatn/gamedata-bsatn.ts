@@ -1,5 +1,5 @@
 import {DbConnection, REMOTE_MODULE} from './bindings/src'
-import {AlgebraicType, BinaryWriter} from "@clockworklabs/spacetimedb-sdk";
+import {AlgebraicType, BinaryWriter} from "spacetimedb";
 import * as fs from "node:fs";
 
 fs.existsSync('../../.env.local') && require('dotenv').config({path: '../../.env.local'});
@@ -8,17 +8,9 @@ const data_dir = process.env.DATA_DIR || "../../workspace/data/bsatn/static";
 
 !fs.existsSync(data_dir) && fs.mkdirSync(data_dir, {recursive: true});
 
-const snakeToCamel = (str: string) =>
-    str.toLowerCase().replace(/([-_][a-z])/g, group =>
-        group
-            .toUpperCase()
-            .replace('_', '')
-    );
-
-type KeyType = keyof typeof REMOTE_MODULE.tables;
 type KeyPair = {
     camel: string;
-    snake: KeyType;
+    snake: string;
 }
 
 interface SchemaResponse {
@@ -84,14 +76,16 @@ async function main() {
     const subscriptions: string[] = [];
     const mappings = new Map<KeyPair, AlgebraicType>();
 
+    const moduleTables = new Map(REMOTE_MODULE.tables.map(t => [t.name, t]));
     for (let schemaTable of schema.tables) {
         if (!isStaticTable(schemaTable)) {
             continue;
         }
-        const tableKey = schemaTable.name as KeyType;
-        const st_arr_type = AlgebraicType.createArrayType(REMOTE_MODULE.tables[tableKey].rowType);
-        mappings.set({camel: snakeToCamel(tableKey), snake: tableKey}, st_arr_type);
-        subscriptions.push(`SELECT * FROM ${tableKey};`)
+        const tableKey = schemaTable.name;
+        const table = moduleTables.get(tableKey);
+        const st_arr_type = AlgebraicType.Array(table.rowType);
+        mappings.set({camel: table.name, snake: table.accessorName}, st_arr_type);
+        subscriptions.push(`SELECT * FROM ${table.name};`)
     }
 
     return new Promise<void>((resolve, reject) => {
