@@ -10,6 +10,7 @@ working_dir=${DATA_DIR:-workspace/bindings}
 for module in global region; do
   json="${working_dir}"/${module}_schema.json
   jq '{"V9": .}' "$json" > "${json}".v9
+  jq '{"V9": del(.misc_exports.[])}' "$json" > "${json}".v9-viewless
 done
 
 for lang in cs rs ts; do
@@ -18,7 +19,11 @@ for lang in cs rs ts; do
     args+=( 'generate' )
     args+=( '-y' )
     args+=( '--module-def' )
-    args+=( "${working_dir}"/"${module}"_schema.json.v9 )
+    if [ "$lang" = "ts" ]; then
+        args+=( "${working_dir}"/"${module}"_schema.json.v9-viewless )
+    else
+      args+=( "${working_dir}"/"${module}"_schema.json.v9 )
+    fi
     args+=( '--lang' )
     args+=( "$lang" )
     args+=( '--out-dir' )
@@ -26,6 +31,11 @@ for lang in cs rs ts; do
     if [ "$lang" = "cs" ]; then
         args+=( '--namespace' )
         args+=( "BitCraft$(echo "$module" | sed 's/./\u&/').Types" )
+    fi
+    if [ "$lang" = "ts" ]; then
+        spacetime version use 1.3.0
+    else
+        spacetime version use 1.12.0
     fi
     spacetime "${args[@]}" &
   done
