@@ -9,7 +9,7 @@ working_dir=${DATA_DIR:-workspace/bindings}
 # Add version 9 indicator for SpaceTime's ModuleDef deserialization
 for module in global region; do
   json="${working_dir}"/${module}_schema.json
-  jq '{"V9": .}' "$json" > "${json}".v9
+  jq '{"V9": del(.misc_exports.[])}' "$json" > "${json}".v9
 done
 
 for lang in cs rs ts; do

@@ -40,8 +40,11 @@ jobs:
           jq . ../region_schema.json > region_schema.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "Update schema: $(date +%Y-%m-%d)"
-          git push origin schema
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Update schema: $(date +%Y-%m-%d)"
+            git push origin schema
+          fi
       - uses: actions/checkout@v4
         if: steps.check-cache.outputs.cache-hit != 'true'
         with:
