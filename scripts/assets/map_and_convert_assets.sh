@@ -6,7 +6,7 @@ WANTED_SPRITES_FILE="wanted_sprites.json"
 GAME_DATA_DIR="game-data/static"
 SPRITES_FILE="sprites.json"
 CONVERTED_DIR="publish/sprites"
-EXTRACTED_DIR="extracted/"
+EXTRACTED_DIR="extracted"
 
 WEBP_TOOLS_URL="https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.6.0-linux-x86-64.tar.gz"
 WEBP_TOOLS_DIR="libwebp-1.6.0-linux-x86-64"
@@ -44,7 +44,7 @@ ASSET_MAP=$(echo "$MAPPINGS" | jq -c '.[]' | while read -r MAP; do
 done | jq -s 'add')
 
 # Step 3: Convert assets using cwebp
-echo "$ASSET_MAP" | jq -r 'to_entries[] | "\(.key) \(.value)"' | while read -r ASSET NAME; do
+echo "$ASSET_MAP" | jq -r 'to_entries[] | "\(.key)\t\(.value)"' | while IFS=$'\t' read -r ASSET NAME; do
     FULL_PATH="$EXTRACTED_DIR/$ASSET"
     if [ -f "$FULL_PATH" ]; then
         OUTPUT_DIR="$CONVERTED_DIR/$(dirname "$NAME")"
