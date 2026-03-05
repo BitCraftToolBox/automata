@@ -52,13 +52,6 @@ jobs:
           STEAM_USER: ${{ secrets.STEAM_USER }}
         run: |
           ./DepotDownloader -app 3454650 -username $STEAM_USER -remember-password -os windows -branch preview
-      - name: Checkout game data repo
-        if: steps.manifest-cache.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: BitCraftToolBox/BitCraft_GameData
-          ref: cereal/cs
-          path: workspace/assets/game-data
       - name: Checkout game assets
         if: steps.manifest-cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
@@ -78,6 +71,13 @@ jobs:
         run: |
           node ../../scripts/assets/unity-asset-ripper.js
           npm exec tsx ../../scripts/assets/read-asset-catalog.ts
+      - name: Checkout game data repo
+        if: steps.manifest-cache.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: BitCraftToolBox/BitCraft_GameData
+          ref: cereal/cs
+          path: workspace/assets/game-data
       - name: Convert required assets
         if: steps.manifest-cache.outputs.cache-hit != 'true'
         working-directory: workspace/assets
