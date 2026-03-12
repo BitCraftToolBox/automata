@@ -37,7 +37,7 @@ for lang in cs rs ts; do
     else
         spacetime version use 1.12.0
     fi
-    spacetime "${args[@]}" &
+    spacetime "${args[@]}"
   done
 done
 
