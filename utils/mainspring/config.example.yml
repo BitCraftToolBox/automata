@@ -1,0 +1,95 @@
+# Mainspring Configuration
+# Copy this file to config.yml and update with your values
+
+# SpacetimeDB Connection
+spacetimedb:
+  host: "bitcraft-early-access.spacetimedb.com"
+  global_module: "bitcraft-global"
+  region_module: "bitcraft-2"
+  bearer_token: ""
+
+# GitHub Actions (global defaults)
+github:
+  owner: "BitCraftToolBox"
+  repo: "automata"
+  token: ""  # Personal access token with workflow permissions
+
+# Discord Webhooks (global defaults)
+discord:
+  enabled: false
+  webhook_url: ""
+
+# Tasks Configuration
+tasks:
+  # Schema Monitor - checks for schema changes
+  schema_monitor:
+    # type: schema_monitor  # Optional: can be omitted if key matches type
+    enabled: true
+    interval: 300  # Check every 5 minutes
+    actions:
+      - type: discord
+        message: "Schema changed! Triggering bindings workflow..."
+        # Optional per-action overrides:
+        # enabled: true
+        # webhook_url: "https://discord.com/api/webhooks/..."
+      - type: github_dispatch
+        workflow: "bindings.yml"
+        # Optional per-action overrides:
+        # owner: "DifferentOrg"
+        # repo: "different-repo"
+        # token: "different_token"
+      - type: restart_task
+        task: "table_subscriber"
+        # Optional: conditional execution based on context
+        # if: "'static_tables' in changes"  # Only restart if static tables changed
+  
+  # Table Subscriber - monitors SpacetimeDB tables
+  table_subscriber:
+    enabled: true
+    reconnect_on_error: true
+    trigger_interval: 60  # Seconds between action triggers (to avoid spam)
+    
+    # Option 1: Custom SQL queries (highest priority)
+    # queries:
+    #   - "SELECT * FROM building_desc WHERE rarity > 2;"
+    #   - "SELECT * FROM item_desc;"
+    
+    # Option 2: Specific table names (converted to SELECT * FROM {table})
+    # tables: ["building_desc", "item_desc", "crafting_desc"]
+    
+    # Option 3: Empty = auto-detect static tables (desc tables + extras)
+    tables: []
+    queries: []
+    
+    actions:
+      - type: discord
+        message: "Game data updated: {description}"
+        # Example: Use different webhook for data updates
+        # webhook_url: "https://discord.com/api/webhooks/.../data-channel"
+      - type: github_dispatch
+        workflow: "sats-json.yml"
+  
+  # Asset Monitor - checks Steam depot manifest
+  asset_monitor:
+    enabled: true
+    interval: 3600  # Check every hour
+    app_id: 3454650  # BitCraft Steam app ID
+    depot_id: 3454651  # Depot ID for Windows build
+    branches: ["public", "preview"]
+    # Optional: Steam credentials (can use anonymous login without these)
+    steam_username: ""
+    steam_password: ""
+    actions:
+      - type: discord
+        message: "New game assets detected on {branches_changed}!"
+        # Example: Send to different channel
+        # webhook_url: "https://discord.com/api/webhooks/.../assets-channel"
+      - type: github_dispatch
+        workflow: "assets.yml"
+        # Example: only trigger for preview branch
+        # if: "'preview' in branches_changed"
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "mainspring.log"
