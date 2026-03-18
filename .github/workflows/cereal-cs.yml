@@ -2,7 +2,7 @@ name: Update C# SDK serialized game data
 on:
   workflow_dispatch:
   schedule:
-    - cron: '42 * * * *'
+    - cron: '42 5 * * *'
 
 jobs:
   cereal-cs:

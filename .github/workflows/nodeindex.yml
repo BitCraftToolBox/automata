@@ -2,7 +2,7 @@ name: Update nodeindex
 on:
   workflow_dispatch:
   schedule:
-    - cron: '37 * * * *'
+    - cron: '37 5 * * *'
 
 jobs:
   build-cacheless-bindings:
