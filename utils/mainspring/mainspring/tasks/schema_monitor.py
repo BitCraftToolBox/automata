@@ -103,11 +103,17 @@ class SchemaChangeDetector(ChangeDetector):
             st = changes["static_tables"]
             description_parts.append(f"{len(st['tables_added'])} tables added, {len(st['tables_removed'])} removed")
 
-        return changed, {
+        context: Dict[str, Any] = {
             "source": "schema_monitor",
             "description": f"Schema changed: {', '.join(description_parts)}",
             "changes": changes
         }
+
+        # Include the current static_tables list in context for subscribers
+        if self._static_tables_cache:
+            context["static_tables"] = list(self._static_tables_cache)
+
+        return changed, context
 
 
 class SchemaMonitorTask(PeriodicChangeMonitorTask):

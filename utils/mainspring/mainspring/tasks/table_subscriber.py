@@ -11,7 +11,7 @@ from websockets.asyncio.client import connect
 from websockets import Subprotocol
 from websockets.exceptions import WebSocketException
 
-from ..core import Task, EventBus
+from ..core import Task, EventBus, Event, EventType
 from .utils import fetch_schema, get_static_tables_from_schema
 
 
@@ -20,6 +20,10 @@ class TableSubscriberTask(Task):
     Subscribes to SpacetimeDB tables and monitors for changes.
     Uses websocket connection to receive real-time updates.
     Filters to static tables (desc tables and extras) if no tables are specified.
+
+    When running in static table mode (no specified tables or queries), this task
+    listens to schema_monitor events and dynamically updates subscriptions when
+    the static_tables list changes.
     """
 
     def __init__(self, name: str, config: Dict[str, Any], event_bus: EventBus,
@@ -37,6 +41,62 @@ class TableSubscriberTask(Task):
         self.queries_to_monitor = config.get("queries", [])  # Custom SQL queries to monitor
         self.trigger_interval = config.get("trigger_interval", 60)  # Seconds between triggers
 
+        # For dynamic subscription updates when schema changes
+        self._subscribed_tables: set[str] = set()  # Track current subscriptions
+        self._next_query_id: int = 0  # Counter for query IDs
+        self._ws_connection = None  # Store websocket connection reference
+
+        # If in static table mode, subscribe to schema monitor events
+        if not self.tables_to_monitor and not self.queries_to_monitor:
+            self.event_bus.subscribe(EventType.CHANGE_DETECTED, self._on_change_detected)
+            self._logger.info(f"Subscribed to schema_monitor events for dynamic table updates")
+
+    async def stop(self):
+        """Stop the task and clean up subscriptions"""
+        # Unsubscribe from event bus if we were subscribed
+        if not self.tables_to_monitor and not self.queries_to_monitor:
+            self.event_bus.unsubscribe(EventType.CHANGE_DETECTED, self._on_change_detected)
+
+        await super().stop()
+
+    async def _on_change_detected(self, event: Event):
+        """Handle CHANGE_DETECTED events from schema_monitor"""
+        # Only process events from schema_monitor
+        if event.source != "schema_monitor":
+            return
+
+        # Check if static_tables changed
+        data = event.data
+        changes = data.get("changes", {})
+
+        if "static_tables" in changes:
+            static_tables_info = changes["static_tables"]
+            tables_added = static_tables_info.get("tables_added", [])
+
+            if tables_added and self._ws_connection:
+                self._logger.info(f"Adding {len(tables_added)} new table subscriptions: {tables_added}")
+                await self._subscribe_to_tables(self._ws_connection, tables_added)
+
+    async def _subscribe_to_tables(self, ws, tables: list[str]):
+        """Subscribe to a list of tables on an active websocket connection"""
+        for table in tables:
+            if table in self._subscribed_tables:
+                continue  # Already subscribed
+
+            query = f"SELECT * FROM {table};"
+            subscribe_msg = json.dumps({
+                "SubscribeMulti": {
+                    "request_id": self._next_query_id,
+                    "query_id": {"id": self._next_query_id},
+                    "query_strings": [query]
+                }
+            })
+            await ws.send(subscribe_msg)
+            self._subscribed_tables.add(table)
+            self._next_query_id += 1
+
+        self._logger.info(f"Successfully subscribed to {len(tables)} new tables")
+
     async def run(self):
         """Main subscription loop"""
         while self._running:
@@ -51,6 +111,11 @@ class TableSubscriberTask(Task):
                     break
                 self._logger.info("Reconnecting in 30 seconds...")
                 await asyncio.sleep(30)
+            finally:
+                # Clear connection reference and subscribed tables on disconnect
+                self._ws_connection = None
+                self._subscribed_tables.clear()
+                self._next_query_id = 0
 
     async def _fetch_static_tables(self) -> list[str]:
         """Fetch schema and filter to static tables (desc tables + extras)"""
@@ -111,6 +176,9 @@ class TableSubscriberTask(Task):
                 max_size=None,
                 max_queue=None
         ) as ws:
+            # Store connection reference for dynamic subscriptions
+            self._ws_connection = ws
+
             # The first message is IdentityToken
             _ = await ws.recv()
             self._logger.debug(f"Received identity token")
@@ -125,6 +193,12 @@ class TableSubscriberTask(Task):
                     }
                 })
                 await ws.send(subscribe_msg)
+                self._next_query_id = idx + 1
+
+                # Track subscribed tables (extract table name from query)
+                if query.strip().upper().startswith("SELECT * FROM "):
+                    table_name = query.strip().split()[3].rstrip(";")
+                    self._subscribed_tables.add(table_name)
 
             self._logger.info(f"Subscribed to {len(queries)} queries")
 
@@ -135,7 +209,7 @@ class TableSubscriberTask(Task):
             async def trigger_actions_delayed():
                 """Delayed action trigger - waits for a quiet period before triggering"""
                 await asyncio.sleep(self.trigger_interval)
-                
+
                 if accumulated_changes:
                     # Calculate summary
                     total_tables = len(accumulated_changes)
@@ -248,7 +322,7 @@ class TableSubscriberTask(Task):
                 except json.JSONDecodeError as e:
                     self._logger.warning(f"Failed to decode message: {e}")
                     continue
-            
+
             # Clean up: if we're shutting down and there's a pending trigger, cancel it
             if trigger_task and not trigger_task.done():
                 trigger_task.cancel()
