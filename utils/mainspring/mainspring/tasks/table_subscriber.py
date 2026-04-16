@@ -109,8 +109,8 @@ class TableSubscriberTask(Task):
                     self._logger.error(f"Unexpected error: {e}", exc_info=True)
                 if not self.reconnect_on_error or not self._running:
                     break
-                self._logger.info("Reconnecting in 30 seconds...")
-                await asyncio.sleep(30)
+                self._logger.info("Reconnecting in 5 seconds...")
+                await asyncio.sleep(5)
             finally:
                 # Clear connection reference and subscribed tables on disconnect
                 self._ws_connection = None
@@ -238,7 +238,7 @@ class TableSubscriberTask(Task):
             # Monitor for updates
             while self._running:
                 try:
-                    msg = await asyncio.wait_for(ws.recv(), timeout=5.0)
+                    msg = await asyncio.wait_for(ws.recv(), timeout=15.0)
                     data = json.loads(msg)
 
                     if "InitialSubscription" in data:
