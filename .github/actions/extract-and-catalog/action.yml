@@ -1,0 +1,40 @@
+name: Extract and catalog assets
+description: Downloads the depot, AssetRipper, checks out game assets, and extracts/catalogs them.
+
+inputs:
+  steam-user:
+    description: Steam username
+    required: true
+  actions-token:
+    description: GitHub token for checking out BitCraft_Assets
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Download depot
+      working-directory: workspace/assets
+      env:
+        STEAM_USER: ${{ inputs.steam-user }}
+      shell: bash
+      run: |
+        ./DepotDownloader -app 3454650 -username $STEAM_USER -remember-password -os windows -branch preview
+    - name: Download AssetRipper
+      working-directory: workspace/assets
+      shell: bash
+      run: |
+        wget -qO AssetRipper.zip https://github.com/AssetRipper/AssetRipper/releases/latest/download/AssetRipper_linux_x64.zip
+        unzip AssetRipper.zip
+    - name: Checkout game assets
+      uses: actions/checkout@v4
+      with:
+        repository: BitCraftToolBox/BitCraft_Assets
+        path: workspace/assets/publish
+        token: ${{ inputs.actions-token }}
+    - name: Extract and catalog assets
+      working-directory: workspace/assets
+      shell: bash
+      run: |
+        node ../../scripts/assets/unity-asset-ripper.js
+        npm exec tsx ../../scripts/assets/read-asset-catalog.ts
+

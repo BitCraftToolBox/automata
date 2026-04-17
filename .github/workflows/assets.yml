@@ -9,14 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Download DepotDownloader
         run: |
           mkdir -p workspace/assets
           cd workspace/assets
           wget -qO DepotDownloader.zip https://github.com/SteamRE/DepotDownloader/releases/download/DepotDownloader_3.4.0/DepotDownloader-linux-x64.zip
           unzip DepotDownloader.zip DepotDownloader
-
       - name: Steam auth cache
         id: auth-cache
         uses: actions/cache@v4
@@ -51,25 +49,12 @@ jobs:
           path: workspace/assets/manifest.txt
           key: manifest-${{ hashFiles('workspace/assets/manifest.txt') }}
 
-      - name: Download depot
-        if: steps.manifest-cache.outputs.cache-hit != 'true'
-        working-directory: workspace/assets
-        env:
-          STEAM_USER: ${{ secrets.STEAM_USER }}
-        run: |
-          ./DepotDownloader -app 3454650 -username $STEAM_USER -remember-password -os windows -branch preview
-      - name: Download AssetRipper
-        if: steps.manifest-cache.outputs.cache-hit != 'true'
-        working-directory: workspace/assets
-        run: |
-          wget -qO AssetRipper.zip https://github.com/AssetRipper/AssetRipper/releases/latest/download/AssetRipper_linux_x64.zip
-          unzip AssetRipper.zip
       - name: Extract and catalog assets
         if: steps.manifest-cache.outputs.cache-hit != 'true'
-        working-directory: workspace/assets
-        run: |
-          node ../../scripts/assets/unity-asset-ripper.js
-          npm exec tsx ../../scripts/assets/read-asset-catalog.ts
+        uses: ./.github/actions/extract-and-catalog
+        with:
+          steam-user: ${{ secrets.STEAM_USER }}
+          actions-token: ${{ secrets.ACTIONS_TOKEN }}
 
       # --- Step 2: Check game data; build path list and cache on its hash ---
 
@@ -94,35 +79,15 @@ jobs:
 
       # --- Step 3: If game data paths changed but client manifest did not, extract the client now ---
 
-      - name: Download depot (game data changed, same client)
-        if: steps.gamedata-paths-cache.outputs.cache-hit != 'true' && steps.manifest-cache.outputs.cache-hit == 'true'
-        working-directory: workspace/assets
-        env:
-          STEAM_USER: ${{ secrets.STEAM_USER }}
-        run: |
-          ./DepotDownloader -app 3454650 -username $STEAM_USER -remember-password -os windows -branch preview
-      - name: Download AssetRipper (game data changed, same client)
-        if: steps.gamedata-paths-cache.outputs.cache-hit != 'true' && steps.manifest-cache.outputs.cache-hit == 'true'
-        working-directory: workspace/assets
-        run: |
-          wget -qO AssetRipper.zip https://github.com/AssetRipper/AssetRipper/releases/latest/download/AssetRipper_linux_x64.zip
-          unzip AssetRipper.zip
       - name: Extract and catalog assets (game data changed, same client)
         if: steps.gamedata-paths-cache.outputs.cache-hit != 'true' && steps.manifest-cache.outputs.cache-hit == 'true'
-        working-directory: workspace/assets
-        run: |
-          node ../../scripts/assets/unity-asset-ripper.js
-          npm exec tsx ../../scripts/assets/read-asset-catalog.ts
+        uses: ./.github/actions/extract-and-catalog
+        with:
+          steam-user: ${{ secrets.STEAM_USER }}
+          actions-token: ${{ secrets.ACTIONS_TOKEN }}
 
       # --- Step 4: Build asset map and convert ---
 
-      - name: Checkout game assets
-        if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: BitCraftToolBox/BitCraft_Assets
-          path: workspace/assets/publish
-          token: ${{ secrets.ACTIONS_TOKEN }}
       - name: Map and convert assets
         if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
         working-directory: workspace/assets
