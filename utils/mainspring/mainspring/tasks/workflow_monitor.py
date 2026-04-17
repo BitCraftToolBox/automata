@@ -145,8 +145,10 @@ class WorkflowMonitorTask(Task):
     async def _execute_follow_up_action(self, action_config: Dict[str, Any], context: Dict[str, Any]):
         """Execute a follow-up action when workflow completes"""
         action_type = action_config.get("type")
+        action_name = action_config.get("name", "0")
+        action_name = f"followup_{action_type}_{action_name}"
         
-        self._logger.info(f"Executing follow-up action: {action_type}")
+        self._logger.info(f"Executing follow-up action: {action_name}")
         
         # Import here to avoid circular dependency
         from ..actions import GitHubDispatchAction, DiscordWebhookAction
@@ -154,14 +156,14 @@ class WorkflowMonitorTask(Task):
         try:
             if action_type == "github_dispatch":
                 action = GitHubDispatchAction(
-                    name=f"followup_{action_type}",
+                    name=action_name,
                     config=action_config,
                     event_bus=self.event_bus,
                     github_config=self.github_config
                 )
             elif action_type == "discord":
                 action = DiscordWebhookAction(
-                    name=f"followup_{action_type}",
+                    name=action_name,
                     config=action_config,
                     event_bus=self.event_bus,
                     discord_config=self.discord_config
@@ -170,12 +172,12 @@ class WorkflowMonitorTask(Task):
                 self._logger.warning(f"Unsupported follow-up action type: {action_type}")
                 return
             
-            # Execute the follow-up action
-            success, _ = await action.execute(context)
+            # Trigger the follow-up action like a normal action (publishes events)
+            success = await action.trigger(context)
             if success:
-                self._logger.info(f"Follow-up action {action_type} completed successfully")
+                self._logger.info(f"Follow-up action {action_name} completed successfully")
             else:
-                self._logger.warning(f"Follow-up action {action_type} failed")
+                self._logger.warning(f"Follow-up action {action_name} failed")
                 
         except Exception as e:
-            self._logger.error(f"Error executing follow-up action: {e}", exc_info=True)
+            self._logger.error(f"Error executing follow-up action {action_name}: {e}", exc_info=True)
