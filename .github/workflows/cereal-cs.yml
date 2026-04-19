@@ -33,7 +33,7 @@ jobs:
           BITCRAFT_GLOBAL_MODULE: ${{ secrets.BITCRAFT_GLOBAL_MODULE }}
           BITCRAFT_REGION_MODULE: ${{ secrets.BITCRAFT_REGION_MODULE }}
           BITCRAFT_BEARER_TOKEN: ${{ secrets.BITCRAFT_BEARER_TOKEN }}
-          DATA_DIR: ${{ github.workspace }}/workspace/data/cereal-cs/static
+          DATA_DIR: ${{ github.workspace }}/workspace/data/cereal-cs
         run: dotnet run --project cereal-cs.csproj
         working-directory: scripts/cereal-cs
       - name: Commit changes

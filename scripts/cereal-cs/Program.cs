@@ -33,11 +33,14 @@ async Task Main()
         throw new Exception("Missing required environment variable BITCRAFT_SPACETIME_HOST.");
     }
 
-    var tables = await GetStaticTableNames(host, region);
+    var tables = await GetStaticTableNames(host, region, dataDir);
+
+    var staticDir = Path.Combine(dataDir, "static");
+    Directory.CreateDirectory(staticDir);
 
     DbConnection? conn = null;
     var cancellationTokenSource = new CancellationTokenSource();
-    conn = ConnectToDatabase(cancellationTokenSource, host, region, token, tables, dataDir);
+    conn = ConnectToDatabase(cancellationTokenSource, host, region, token, tables, staticDir);
     var thread = new Thread(() => ProcessThread(conn, cancellationTokenSource.Token));
     thread.Start();
     thread.Join();
@@ -64,7 +67,7 @@ void ProcessThread(DbConnection conn, CancellationToken ct)
     }
 }
 
-async Task<string[]> GetStaticTableNames(string host, string module)
+async Task<string[]> GetStaticTableNames(string host, string module, string dataDir)
 {
     using var client = new HttpClient();
     var response = await client.GetAsync($"https://{host}/v1/database/{module}/schema?version=9");
@@ -74,11 +77,21 @@ async Task<string[]> GetStaticTableNames(string host, string module)
     }
 
     var content = await response.Content.ReadAsStringAsync();
-    var schema = JsonConvert.DeserializeObject<Dictionary<string, object>>(content);
+    var schema = JsonConvert.DeserializeObject<JObject>(content);
     if (schema == null || !schema.TryGetValue("tables", out var value))
     {
         throw new Exception("Invalid schema format: 'tables' field not found");
     }
+
+    // Sort row_level_security by sql to avoid spurious diffs
+    if (schema.TryGetValue("row_level_security", out var rlsToken) && rlsToken is JArray rls)
+    {
+        var sorted = new JArray(rls.OrderBy(item => item["sql"]?.ToString()));
+        schema["row_level_security"] = sorted;
+    }
+
+    var schemaPath = Path.Combine(dataDir, "region_schema.json");
+    File.WriteAllText(schemaPath, schema.ToString(Formatting.Indented));
 
     var schemaTables = ((JArray) value).ToObject<List<Dictionary<string, object>>>();
     if (schemaTables == null)
