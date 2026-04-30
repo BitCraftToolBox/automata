@@ -104,6 +104,12 @@ def save_tables(data_dir, tables):
 
     for name, data in tables.items():
         data = sorted(data, key=_get_sort)
+
+        # haha even more ugly
+        if name == 'building_function_type_mapping_desc':
+            for row in data:
+                row['desc_ids'] = sorted(row['desc_ids'])
+
         with open(data_dir / (name + '.json'), 'w') as f:
             json.dump(data, fp=f, indent=2)
 

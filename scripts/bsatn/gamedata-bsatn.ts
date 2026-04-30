@@ -60,7 +60,16 @@ const createOnConnect = (subscriptions: string[], mappings: Map<KeyPair, Algebra
             for (let [{camel, snake}, st_type] of mappings.entries()) {
                 const table: any = conn.db[camel as keyof typeof conn.db];
                 const bw = new BinaryWriter(1024 * 1024);
-                st_type.serialize(bw, Array.from(table.iter()));
+                let iter: any[];
+                if (snake === 'building_function_type_mapping_desc') {
+                    iter = Array.from(table.iter(), (o) => {
+                        o['descIds'] = o['descIds'].sort((a, b) => a - b);
+                        return o;
+                    });
+                } else {
+                    iter = table.iter();
+                }
+                st_type.serialize(bw, iter);
                 // this is the one place we could probably write async and await on all the files at the end,
                 // but that seems like too much effort for something already quite fast
                 fs.writeFileSync(`${data_dir}/${snake}.bsatn`, bw.getBuffer());

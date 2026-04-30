@@ -192,6 +192,14 @@ void OnSubscriptionApplied(SubscriptionEventContext ctx, string[] tables, string
                 var sorted = array.OrderBy(item => item[sortKey]?.ToObject<object>());
                 array = new JArray(sorted);
             }
+
+            if (table.Equals("building_function_type_mapping_desc"))
+            {
+                foreach (var obj in array)
+                {
+                    obj["desc_ids"] = new JArray(obj["desc_ids"]!.OrderBy(id => id.ToObject<int>()));
+                }
+            }
         }
 
         File.WriteAllText($"{dataDir}/{table}.json", JsonConvert.SerializeObject(array, Formatting.Indented));
