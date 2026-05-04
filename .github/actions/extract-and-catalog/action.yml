@@ -37,4 +37,3 @@ runs:
       run: |
         node ../../scripts/assets/unity-asset-ripper.js
         npm exec tsx ../../scripts/assets/read-asset-catalog.ts
-

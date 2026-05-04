@@ -86,6 +86,17 @@ jobs:
           steam-user: ${{ secrets.STEAM_USER }}
           actions-token: ${{ secrets.ACTIONS_TOKEN }}
 
+      # --- Step 3.5: If either client manifest or game data paths changed, save lists to artifacts
+
+      - name: Save catalog and game data paths to artifacts
+        if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: asset-extraction-metadata
+          path: |
+            workspace/assets/sprites.json
+            workspace/assets/gamedata_paths.json
+
       # --- Step 4: Build asset map and convert ---
 
       - name: Map and convert assets
