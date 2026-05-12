@@ -67,7 +67,7 @@ void ProcessThread(DbConnection conn, CancellationToken ct)
     }
 }
 
-async Task<string[]> GetStaticTableNames(string host, string module, string dataDir)
+async Task<Dictionary<string, string>> GetStaticTableNames(string host, string module, string dataDir)
 {
     using var client = new HttpClient();
     var response = await client.GetAsync($"https://{host}/v1/database/{module}/schema?version=9");
@@ -78,7 +78,7 @@ async Task<string[]> GetStaticTableNames(string host, string module, string data
 
     var content = await response.Content.ReadAsStringAsync();
     var schema = JsonConvert.DeserializeObject<JObject>(content);
-    if (schema == null || !schema.TryGetValue("tables", out var value))
+    if (schema == null || !schema.TryGetValue("tables", out var tableArray))
     {
         throw new Exception("Invalid schema format: 'tables' field not found");
     }
@@ -93,7 +93,25 @@ async Task<string[]> GetStaticTableNames(string host, string module, string data
     var schemaPath = Path.Combine(dataDir, "region_schema.json");
     File.WriteAllText(schemaPath, schema.ToString(Formatting.Indented));
 
-    var schemaTables = ((JArray) value).ToObject<List<Dictionary<string, object>>>();
+    var schemaTypes =
+        schema.TryGetValue("typespace", out var typespaceToken) && typespaceToken is JObject typespace 
+            && typespace.TryGetValue("types", out var typesToken) && typesToken is JArray types
+        ? types.ToObject<List<Dictionary<string, object>>>()
+        : null;
+    if (schemaTypes == null)
+    {
+        throw new Exception("Invalid schema format: typespace or types field not found or not in expected format.");
+    }
+
+    // Extract the types JArray for later use in GetPrimaryKey
+    JArray? typesArray = null;
+    if (schema.TryGetValue("typespace", out var typespaceTokenTemp) && typespaceTokenTemp is JObject typespaceTemp
+        && typespaceTemp.TryGetValue("types", out var typesTokenTemp) && typesTokenTemp is JArray typesArrayTemp)
+    {
+        typesArray = typesArrayTemp;
+    }
+
+    var schemaTables = ((JArray) tableArray).ToObject<List<Dictionary<string, object>>>();
     if (schemaTables == null)
     {
         throw new Exception("Invalid schema format: tables wasn't a list of dictionaries.");
@@ -108,11 +126,62 @@ async Task<string[]> GetStaticTableNames(string host, string module, string data
         .Where(name => !name.EndsWith("_state"))
         .Where(name => descRegex.IsMatch(name) || Array.IndexOf(extraTables, name) > -1)
         .ToArray();
+    
+    // Build a map of table name to (primary_key_index, product_type_ref)
+    var tableMap = new Dictionary<string, (int pkIdx, long typeRef)>();
+    foreach (var table in tables)
+    {
+        var tableEntry = ((JArray) tableArray).FirstOrDefault(t => (string) t["name"]! == table);
+        if (tableEntry == null) continue;
+        var primaryKey = (int) tableEntry["primary_key"]![0]!;
+        var productTypeRef = (long) tableEntry["product_type_ref"]!;
+        tableMap[table] = (primaryKey, productTypeRef);
+    }
 
-    return tables;
+    return tables.ToDictionary(name => name, GetPrimaryKey);
+
+    string GetPrimaryKey(string tableName)
+    {
+        if (!tableMap.TryGetValue(tableName, out var tableInfo))
+        {
+            return "";
+        }
+
+        if (typesArray == null || tableInfo.typeRef < 0 || tableInfo.typeRef >= typesArray.Count)
+        {
+            return "";
+        }
+
+        if (typesArray[(int)tableInfo.typeRef] is not JObject typeObj || !typeObj.TryGetValue("Product", out var productToken) || productToken is not JObject product)
+        {
+            return "";
+        }
+
+        if (!product.TryGetValue("elements", out var elementsToken) || elementsToken is not JArray elements)
+        {
+            return "";
+        }
+
+        if (tableInfo.pkIdx < 0 || tableInfo.pkIdx >= elements.Count)
+        {
+            return "";
+        }
+
+        if (elements[tableInfo.pkIdx] is not JObject element || !element.TryGetValue("name", out var nameToken) || nameToken is not JObject nameObj)
+        {
+            return "";
+        }
+
+        if (nameObj.TryGetValue("some", out var nameValue))
+        {
+            return (string?) nameValue ?? "";
+        }
+
+        return "";
+    }
 }
 
-DbConnection ConnectToDatabase(CancellationTokenSource token, string host, string region, string? bearerToken, string[] tables, string dataDir)
+DbConnection ConnectToDatabase(CancellationTokenSource token, string host, string region, string? bearerToken, Dictionary<string, string> tables, string dataDir)
 {
     DbConnection? conn = null;
     conn = DbConnection.Builder()
@@ -130,10 +199,10 @@ DbConnection ConnectToDatabase(CancellationTokenSource token, string host, strin
     return conn;
 }
 
-void OnConnected(DbConnection conn, string[] tables, string dataDir)
+void OnConnected(DbConnection conn, Dictionary<string, string> tables, string dataDir)
 {
     var queries = tables
-        .Select(table => $"SELECT * FROM {table};")
+        .Select(table => $"SELECT * FROM {table.Key};")
         .ToArray();
 
     conn.SubscriptionBuilder()
@@ -167,14 +236,12 @@ MethodInfo ReflectIterator(object handle)
     return methodInfo;
 }
 
-void OnSubscriptionApplied(SubscriptionEventContext ctx, string[] tables, string dataDir)
+void OnSubscriptionApplied(SubscriptionEventContext ctx, Dictionary<string, string> tables, string dataDir)
 {
     var converters = new StringEnumConverter();
-    var sortKeys = new[] { "id", "item_id", "building_id", "name", "cargo_id", "type_id" };
-
 
     var getTableMethod = ReflectTables(ctx.Db);
-    foreach (var table in tables)
+    foreach (var (table, sortKey) in tables)
     {
         var tblHandle = getTableMethod.Invoke(ctx.Db, [table])!;
         var getIterMethod = ReflectIterator(tblHandle);
@@ -184,10 +251,7 @@ void OnSubscriptionApplied(SubscriptionEventContext ctx, string[] tables, string
 
         if (array.Count > 0)
         {
-            // Find the first key that exists in the objects
-            var sortKey = sortKeys.FirstOrDefault(key => array[0][key] != null);
-
-            if (sortKey != null)
+            if (!string.IsNullOrEmpty(sortKey))
             {
                 var sorted = array.OrderBy(item => item[sortKey]?.ToObject<object>());
                 array = new JArray(sorted);

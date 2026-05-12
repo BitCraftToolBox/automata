@@ -97,15 +97,18 @@ def _is_static_table(tbl):
     return False
 
 
-def save_tables(data_dir, tables):
-    def _get_sort(x):
-        # incredibly ugly but ok
-        return x.get('id', x.get('item_id', x.get('building_id', x.get('name', x.get('cargo_id', x.get('type_id', -1))))))
+def save_tables(data_dir, tables, schema):
+    schema_types = schema['typespace']['types']
+    table_map = {o['name']: (o['primary_key'][0], o['product_type_ref']) for o in schema['tables'] if o['name'] in tables}
 
     for name, data in tables.items():
-        data = sorted(data, key=_get_sort)
+        table_schema = table_map[name]
+        pk_idx = table_schema[0]
+        table_type_ref = table_schema[1]
+        pk_name = schema_types[table_type_ref]["Product"]["elements"][pk_idx]["name"]["some"]
 
-        # haha even more ugly
+        data = sorted(data, key=lambda x: x[pk_name])
+
         if name == 'building_function_type_mapping_desc':
             for row in data:
                 row['desc_ids'] = sorted(row['desc_ids'])
@@ -137,7 +140,7 @@ def main():
     # would like to get the static data from the global db, but it has a few empty tables
     # update 2026-02-24: still missing a bunch https://i.imgur.com/fGnZHqk.png
     static_data = get_tables(stdb_host, region_mod, static_tables, auth)
-    save_tables(static_dir, static_data)
+    save_tables(static_dir, static_data, schema_reg)
 
 
 if __name__ == '__main__':
