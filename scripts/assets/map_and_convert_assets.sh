@@ -47,3 +47,6 @@ for f in "$EXTRACTED_DIR"/Assets/_Project/StaticAssets/_AddressedAssets/I18N/*.b
     name="$(basename "$f")"
     cp -- "$f" "publish/I18N/${name%.bytes}.csv"
 done
+
+mkdir -p "publish/fonts"
+cp "$EXTRACTED_DIR"/Assets/Resources/fonts/icons/*.otf publish/fonts/
