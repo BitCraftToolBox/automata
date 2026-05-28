@@ -10,5 +10,6 @@
   "premium_item_desc": "image_address",
   "premium_service_desc": "image_address",
   "resource_desc": "icon_asset_name",
-  "placeable_desc": "icon_asset_name"
+  "placeable_desc": "icon_asset_name",
+  "deployable_appearance_override_desc": "icon_asset_name"
 }
