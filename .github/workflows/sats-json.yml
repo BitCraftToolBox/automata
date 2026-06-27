@@ -35,7 +35,7 @@ jobs:
         BITCRAFT_REGION_MODULE: ${{ secrets.BITCRAFT_REGION_MODULE }}
         BITCRAFT_BEARER_TOKEN: ${{ secrets.BITCRAFT_BEARER_TOKEN }}
         DATA_DIR: ./workspace/data/sats-json
-      run: python scripts/sats-json/gamedata-sats-json.py
+      run: python scripts/sats-json/gamedata_sats_json.py
     - name: Commit changes
       if: steps.update-data.outputs.updated_data == 'true'
       run: |
