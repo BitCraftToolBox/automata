@@ -37,3 +37,8 @@ runs:
       run: |
         node ../../scripts/assets/unity-asset-ripper.js
         npm exec tsx ../../scripts/assets/read-asset-catalog.ts
+    - name: List extracted PNGs
+      working-directory: workspace/assets
+      shell: bash
+      run: |
+        find extracted -name "*.png" | sort > extracted_pngs.txt

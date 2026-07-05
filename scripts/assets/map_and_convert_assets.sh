@@ -5,13 +5,22 @@ set -e
 GAMEDATA_PATHS_FILE="gamedata_paths.json"
 SPRITES_FILE="sprites.json"
 CONVERTED_DIR="publish/sprites"
-EXTRACTED_DIR="extracted"
 
-WEBP_TOOLS_URL="https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.6.0-linux-x86-64.tar.gz"
-WEBP_TOOLS_DIR="libwebp-1.6.0-linux-x86-64"
-curl -O "$WEBP_TOOLS_URL"
-tar -xzf "$(basename $WEBP_TOOLS_URL)"
-CWEBP_PATH="$WEBP_TOOLS_DIR/bin/cwebp"
+if true; then
+  EXTRACTED_DIR="extracted"
+  WEBP_TOOLS_URL="https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.6.0-linux-x86-64.tar.gz"
+  WEBP_TOOLS_DIR="libwebp-1.6.0-linux-x86-64"
+  curl -O "$WEBP_TOOLS_URL"
+  tar -xzf "$(basename $WEBP_TOOLS_URL)"
+  CWEBP_PATH="$WEBP_TOOLS_DIR/bin/cwebp"
+else
+  EXTRACTED_DIR="/path/to/assetripper/output"
+  WEBP_TOOLS_URL="https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.6.0-windows-x64.zip"
+  WEBP_TOOLS_DIR="libwebp-1.6.0-windows-x64"
+  curl -O "$WEBP_TOOLS_URL"
+  unzip "$(basename $WEBP_TOOLS_URL)"
+  CWEBP_PATH="$WEBP_TOOLS_DIR/bin/cwebp.exe"
+fi
 
 # Step 1: Build asset map from game data paths + sprites catalog
 echo "Converting game data sprites."
@@ -44,22 +53,27 @@ done
 # Step 3: Copy other assets that don't come from game data mappings
 
 # Extra UI elements that aren't referenced by game data but are useful for building game-like UI elements
-declare -A EXTRA_PNG_CONVERSION_MAP=(
-    ["Assets/_Project/StaticAssets/_AddressedAssets/Sprites/Randy UI/Entities"]="UI/Frames"
-    ["Assets/_Project/StaticAssets/_AddressedAssets/Sprites/Randy UI/Badges"]="UI/Badges"
-)
-
-echo "Converting extra UI elements."
-for source_dir in "${!EXTRA_PNG_CONVERSION_MAP[@]}"; do
-    target_dir="${EXTRA_PNG_CONVERSION_MAP[$source_dir]}"
-    mkdir -p "publish/$target_dir"
-    echo "\"$EXTRACTED_DIR/${source_dir}\" -> \"publish/${target_dir}\""
-    for f in "$EXTRACTED_DIR/$source_dir"/*.png; do
-        [ -e "$f" ] || continue
-        name="$(basename "$f")"
-        "$CWEBP_PATH" -lossless "$f" -o "publish/$target_dir/${name}.webp"
-    done
-done
+# TODO deal with atlases
+#declare -A EXTRA_PNG_CONVERSION_MAP=(
+#    ["Assets/_Project/StaticAssets/_AddressedAssets/Sprites/Randy UI/Atlased/Small/Entities/"]="UI/Frames"
+#    ["Assets/_Project/StaticAssets/_AddressedAssets/Sprites/Randy UI/Atlased/Small/Badges/"]="UI/Badges"
+#)
+#
+#echo "Converting extra UI elements."
+#for source_dir in "${!EXTRA_PNG_CONVERSION_MAP[@]}"; do
+#    target_dir="${EXTRA_PNG_CONVERSION_MAP[$source_dir]}"
+#    mkdir -p "publish/$target_dir"
+#    echo "\"$EXTRACTED_DIR/${source_dir}\" -> \"publish/${target_dir}\""
+#    for f in "$EXTRACTED_DIR/$source_dir"/*.png; do
+#        if [ ! -e "$f" ]; then
+#          echo "Expected files in extra asset directory, but none found: $source_dir."
+#          continue
+#        fi
+#        name=$(basename "$f" .png)
+#        output="publish/$target_dir/${name}.webp"
+#        "$CWEBP_PATH" -lossless "$f" -o "$output"
+#    done
+#done
 
 # translation files
 echo "Copying translation files."

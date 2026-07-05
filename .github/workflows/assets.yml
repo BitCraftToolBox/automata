@@ -96,6 +96,7 @@ jobs:
           path: |
             workspace/assets/sprites.json
             workspace/assets/gamedata_paths.json
+            workspace/assets/extracted_pngs.txt
 
       # --- Step 4: Build asset map and convert ---
 
