@@ -46,6 +46,9 @@ class TableSubscriberTask(Task):
         self._next_query_id: int = 0  # Counter for query IDs
         self._ws_connection = None  # Store websocket connection reference
 
+        # Persists across reconnects to detect st_module hotswaps
+        self._st_module_program_hash: Optional[str] = None
+
         # If in static table mode, subscribe to schema monitor events
         if not self.tables_to_monitor and not self.queries_to_monitor:
             self.event_bus.subscribe(EventType.CHANGE_DETECTED, self._on_change_detected)
@@ -215,13 +218,11 @@ class TableSubscriberTask(Task):
                     total_tables = len(accumulated_changes)
                     total_inserts = sum(c["inserts"] for c in accumulated_changes.values())
                     total_deletes = sum(c["deletes"] for c in accumulated_changes.values())
-                    total_updates = sum(c["updates"] for c in accumulated_changes.values())
 
                     summary = {
                         "tables_updated": total_tables,
                         "total_inserts": total_inserts,
                         "total_deletes": total_deletes,
-                        "total_updates": total_updates
                     }
 
                     self._logger.info(f"Triggering actions for {total_tables} tables: {summary}")
@@ -241,7 +242,37 @@ class TableSubscriberTask(Task):
                     msg = await asyncio.wait_for(ws.recv(), timeout=15.0)
                     data = json.loads(msg)
 
-                    if "InitialSubscription" in data:
+                    if "SubscribeMultiApplied" in data:
+                        init_sub = data["SubscribeMultiApplied"]
+                        db_update = init_sub.get("update", {})
+                        for table_update in db_update.get("tables", []):
+                            if table_update.get("table_name") != "st_module":
+                                continue
+                            for update in table_update.get("updates", []):
+                                inserts = update.get("inserts", [])
+                                if not inserts:
+                                    continue
+                                new_hash = json.loads(inserts[0]).get("program_hash")
+                                if new_hash is None:
+                                    continue
+                                if (self._st_module_program_hash is not None
+                                        and new_hash != self._st_module_program_hash):
+                                    self._logger.info(
+                                        f"st_module program_hash changed on reconnect: "
+                                        f"{self._st_module_program_hash!r} -> {new_hash!r}"
+                                    )
+                                    if "st_module" not in accumulated_changes:
+                                        accumulated_changes["st_module"] = {"inserts": 0, "deletes": 0}
+                                    accumulated_changes["st_module"]["deletes"] += 1
+                                    accumulated_changes["st_module"]["inserts"] += 1
+                                    if trigger_task and not trigger_task.done():
+                                        trigger_task.cancel()
+                                        try:
+                                            await trigger_task
+                                        except asyncio.CancelledError:
+                                            pass
+                                    trigger_task = asyncio.create_task(trigger_actions_delayed())
+                                self._st_module_program_hash = new_hash
                         continue
 
                     # Handle TransactionUpdate messages
@@ -269,39 +300,15 @@ class TableSubscriberTask(Task):
                                     accumulated_changes[table_name] = {
                                         "inserts": 0,
                                         "deletes": 0,
-                                        "updates": 0
                                     }
 
                                 for update in updates:
                                     inserts = update.get("inserts", [])
                                     deletes = update.get("deletes", [])
 
-                                    # Try to match inserted and deleted rows by ID to detect updates
-                                    matched_updates = 0
-                                    if inserts and deletes:
-                                        try:
-                                            # Parse insert and delete rows as JSON objects
-                                            inserted_rows = [json.loads(row) for row in inserts]
-                                            deleted_rows = [json.loads(row) for row in deletes]
-
-                                            # Check if rows are dicts with "id" key
-                                            if (inserted_rows and deleted_rows and
-                                                    isinstance(inserted_rows[0], dict) and "id" in inserted_rows[0] and
-                                                    isinstance(deleted_rows[0], dict) and "id" in deleted_rows[0]):
-                                                # Extract IDs from row objects
-                                                inserted_ids = {row["id"] for row in inserted_rows if isinstance(row, dict) and "id" in row}
-                                                deleted_ids = {row["id"] for row in deleted_rows if isinstance(row, dict) and "id" in row}
-
-                                                # Count matching IDs as updates
-                                                matched_updates = len(inserted_ids & deleted_ids)
-                                        except (json.JSONDecodeError, KeyError, TypeError) as e:
-                                            # If we can't parse or match IDs, just count inserts/deletes separately
-                                            self._logger.debug(f"Could not match IDs for {table_name}: {e}")
-
                                     # Count total inserts and deletes
                                     accumulated_changes[table_name]["inserts"] += len(inserts)
                                     accumulated_changes[table_name]["deletes"] += len(deletes)
-                                    accumulated_changes[table_name]["updates"] += matched_updates
 
                             self._logger.debug(f"Transaction #{update_count}: {len(tables_updated)} tables updated")
 

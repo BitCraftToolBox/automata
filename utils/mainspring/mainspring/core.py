@@ -294,6 +294,7 @@ class PeriodicChangeMonitorTask(Task):
         super().__init__(name, config, event_bus)
         self.interval = config.get("interval", 300)  # Default 5 minutes
         self.detector: Optional[ChangeDetector] = None  # Subclasses must set this
+        self._run_now = False
 
     async def run(self):
         """Main monitoring loop - periodically checks detector and triggers actions"""
@@ -317,8 +318,16 @@ class PeriodicChangeMonitorTask(Task):
                 for _ in range(self.interval):
                     if not self._running:
                         break
+                    if self._run_now:
+                        self._run_now = False
+                        break
                     await asyncio.sleep(1)
 
             except Exception as e:
                 self._logger.error(f"Error in monitor: {e}", exc_info=True)
                 await asyncio.sleep(60)  # Wait a minute before retrying
+
+    async def restart(self):
+        self._logger.info(f"Restart received for: {self.name}, immediately triggering")
+        await asyncio.sleep(1)  # Brief pause before restarting
+        self._run_now = True

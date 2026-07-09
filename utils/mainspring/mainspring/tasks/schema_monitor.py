@@ -4,6 +4,7 @@ Schema monitor task for detecting SpacetimeDB schema changes.
 
 import hashlib
 import json
+import logging
 from typing import Any, Dict, Optional
 
 from ..core import EventBus, ChangeDetector, PeriodicChangeMonitorTask
@@ -20,6 +21,7 @@ class SchemaChangeDetector(ChangeDetector):
         self._last_global_hash: Optional[str] = None
         self._last_region_hash: Optional[str] = None
         self._static_tables_cache: list[str] = []
+        self._logger = logging.getLogger(f"mainspring.change_detector.schema")
 
     @staticmethod
     def _hash_schema(schema: Dict[str, Any]) -> str:
@@ -90,6 +92,7 @@ class SchemaChangeDetector(ChangeDetector):
                         "tables_removed": removed_tables,
                         "total_tables": len(new_static_tables)
                     }
+                    self._logger.info("Static tables added: +%s", added_tables)
 
             self._static_tables_cache = new_static_tables
 
