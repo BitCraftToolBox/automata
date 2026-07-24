@@ -69,14 +69,14 @@ const createOnConnect = (subscriptions: string[], mappings: Map<KeyPair, Algebra
                 } else {
                     array = Array.from(table.iter());
                 }
-                if (array.length) {
-                    const pk = REMOTE_MODULE.tables[snake].primaryKey;
-                    if (pk) {
-                        array.sort((a, b) => {
-                            return a[pk] - b[pk];
-                        });
-                    }
-                }
+                // if (array.length) {
+                //     const pk = REMOTE_MODULE.tables[snake].primaryKey;
+                //     if (pk) {
+                //         array.sort((a, b) => {
+                //             return a[pk] - b[pk];
+                //         });
+                //     }
+                // }
 
                 st_type.serialize(bw, array);
 
