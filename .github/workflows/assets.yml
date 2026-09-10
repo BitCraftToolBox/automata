@@ -68,14 +68,17 @@ jobs:
         working-directory: workspace/assets
         run: |
           cp ../../scripts/assets/wanted_sprites.json .
+          cp ../../scripts/assets/wanted_prefabs.json .
           chmod +x ../../scripts/assets/build_gamedata_paths.sh
           ../../scripts/assets/build_gamedata_paths.sh
       - name: Cache game data paths
         id: gamedata-paths-cache
         uses: actions/cache@v4
         with:
-          path: workspace/assets/gamedata_paths.json
-          key: gamedata-paths-${{ hashFiles('workspace/assets/gamedata_paths.json') }}
+          path: |
+            workspace/assets/gamedata_paths_sprites.json
+            workspace/assets/gamedata_paths_prefabs.json
+          key: gamedata-paths-${{ hashFiles('workspace/assets/gamedata_paths_sprites.json', 'workspace/assets/gamedata_paths_prefabs.json') }}
 
       # --- Step 3: If game data paths changed but client manifest did not, extract the client now ---
 
@@ -95,7 +98,8 @@ jobs:
           name: asset-extraction-metadata
           path: |
             workspace/assets/sprites.json
-            workspace/assets/gamedata_paths.json
+            workspace/assets/gamedata_paths_sprites.json
+            workspace/assets/gamedata_paths_prefabs.json
             workspace/assets/extracted_pngs.txt
 
       # --- Step 4: Build asset map and convert ---
@@ -117,5 +121,59 @@ jobs:
           git add -A
           if ! git diff --cached --quiet; then
             git commit -m "Update assets: $(date +%Y-%m-%d)"
+            git push origin
+          fi
+
+      # --- Step 5: Publish prefab models to the BitCraft_Models submodule repo ---
+
+      - name: Checkout prefab models repo
+        if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: BitCraftToolBox/BitCraft_Models
+          path: workspace/assets/models
+          token: ${{ secrets.ACTIONS_TOKEN }}
+
+      - name: Install asset script dependencies
+        if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
+        working-directory: scripts/assets
+        run: npm install
+
+      - name: Publish prefabs
+        if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
+        working-directory: workspace/assets
+        run: npm exec tsx ../../scripts/assets/publish_prefabs.ts
+
+      - name: Commit and push prefab models
+        if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
+        id: push-models
+        working-directory: workspace/assets/models
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Update prefabs: $(date +%Y-%m-%d)"
+            git push origin
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump prefabs submodule
+        if: steps.push-models.outputs.pushed == 'true'
+        working-directory: workspace/assets/publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C prefabs fetch origin
+          git -C prefabs checkout "$(git -C ../models rev-parse HEAD)"
+          git add prefabs
+          if ! git diff --cached --quiet; then
+            git commit -m "Update prefabs submodule: $(date +%Y-%m-%d)"
             git push origin
           fi

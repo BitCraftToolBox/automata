@@ -1,0 +1,6 @@
+{
+  "devDependencies": {
+    "@gltf-transform/cli": "^4.5.0",
+    "@types/node": "^25.3.0"
+  }
+}

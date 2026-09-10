@@ -2,7 +2,7 @@
 
 set -e
 
-GAMEDATA_PATHS_FILE="gamedata_paths.json"
+GAMEDATA_PATHS_FILE="gamedata_paths_sprites.json"
 SPRITES_FILE="sprites.json"
 CONVERTED_DIR="publish/sprites"
 

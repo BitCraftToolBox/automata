@@ -162,3 +162,29 @@ for (const [key, value] of Object.entries(all)) {
 }
 
 fs.writeFileSync(outputFile, JSON.stringify(all, null, 2));
+
+// Prefabs: collect every GameObject-typed catalog entry, keyed by its full catalog key.
+// Unlike sprites, prefab keys don't share one namespace (Prefabs/Category/Name, Interiors/Name,
+// bare GUIDs, bare addressable names like "Bushes/SticksDeplete" all show up), so we keep the
+// full key here and let callers prepend whatever prefix their game-data field needs.
+const prefabsOutputFile = "prefabs.json";
+const prefabs: Record<string, string> = {};
+for (const b of buckets) {
+  const k = keyByOffset.get(b.keyOffset);
+  if (!k) continue;
+
+  const keyStr = String(k.value);
+
+  for (const entryIndex of b.entryIndices) {
+    const e = entries[entryIndex];
+    if (!e) continue;
+
+    const rType = typeName(json, e.resourceTypeIndex);
+    if (rType !== "UnityEngine.GameObject") continue;
+
+    const internalId = json.m_InternalIds[e.internalIdIndex];
+    prefabs[keyStr] = internalId;
+  }
+}
+
+fs.writeFileSync(prefabsOutputFile, JSON.stringify(prefabs, null, 2));

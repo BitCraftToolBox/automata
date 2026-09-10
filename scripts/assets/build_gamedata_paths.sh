@@ -3,27 +3,47 @@
 set -e
 
 WANTED_SPRITES_FILE="wanted_sprites.json"
+WANTED_PREFABS_FILE="wanted_prefabs.json"
 GAME_DATA_DIR="game-data/static"
-GAMEDATA_PATHS_FILE="gamedata_paths.json"
+GAMEDATA_PATHS_SPRITES_FILE="gamedata_paths_sprites.json"
+GAMEDATA_PATHS_PREFABS_FILE="gamedata_paths_prefabs.json"
 
-# Extract all sprite names referenced in game data tables (no sprites.json lookup needed)
-MAPPINGS=$(jq -n \
-    --arg GAME_DATA_DIR "$GAME_DATA_DIR" \
-    --slurpfile wanted "$WANTED_SPRITES_FILE" \
-    '($wanted[0] | to_entries | map({
-        table: .key,
-        field: .value,
-        file: ($GAME_DATA_DIR + "/" + .key + ".json")
-    }))')
-
-echo "$MAPPINGS" | jq -c '.[]' | while read -r MAP; do
-    FILE=$(echo "$MAP" | jq -r '.file')
-    FIELD=$(echo "$MAP" | jq -r '.field')
+# Extracts every value of $FIELD (dotted paths supported) across all rows of $FILE, unpacking
+# array-valued fields (e.g. wanted_prefabs.json's wall_asset_names) into individual values.
+extract_values() {
+    local FILE="$1"
+    local FIELD="$2"
     if [ -f "$FILE" ]; then
         jq -r --arg FIELD "$FIELD" \
-            '[.[] | select(.[$FIELD] != null and .[$FIELD] != "") | .[$FIELD]] | .[]' "$FILE"
+            '[.[] | getpath($FIELD | split(".")) | select(. != null and . != "") | if type == "array" then .[] else . end] | .[]' \
+            "$FILE"
     fi
-done | sort -u | jq -R . | jq -s 'sort' > "$GAMEDATA_PATHS_FILE"
+}
 
-echo "Game data paths saved to $GAMEDATA_PATHS_FILE"
+# Kept as two separate files, not merged: map_and_convert_assets.sh matches every value in its
+# input file against sprites.json, so a prefab-only value that happens to also be a valid sprite
+# name would get fetched as an unwanted sprite if the two lists were combined. Callers that just
+# want a single cache key covering both (e.g. the workflow's gamedata-paths-cache) can hash both
+# files together with hashFiles().
 
+# Sprites: wanted_sprites.json is {table: field}, one field per table.
+jq -n --slurpfile wanted "$WANTED_SPRITES_FILE" \
+    '$wanted[0] | to_entries | map({table: .key, field: .value})' \
+    | jq -c '.[]' \
+    | while read -r MAP; do
+        TABLE=$(echo "$MAP" | jq -r '.table')
+        FIELD=$(echo "$MAP" | jq -r '.field')
+        extract_values "$GAME_DATA_DIR/$TABLE.json" "$FIELD"
+    done \
+    | sort -u | jq -R . | jq -s 'sort' > "$GAMEDATA_PATHS_SPRITES_FILE"
+
+# Prefabs: wanted_prefabs.json is [{table, field, prefix}], several fields per table.
+jq -c '.[]' "$WANTED_PREFABS_FILE" \
+    | while read -r MAP; do
+        TABLE=$(echo "$MAP" | jq -r '.table')
+        FIELD=$(echo "$MAP" | jq -r '.field')
+        extract_values "$GAME_DATA_DIR/$TABLE.json" "$FIELD"
+    done \
+    | sort -u | jq -R . | jq -s 'sort' > "$GAMEDATA_PATHS_PREFABS_FILE"
+
+echo "Game data paths saved to $GAMEDATA_PATHS_SPRITES_FILE and $GAMEDATA_PATHS_PREFABS_FILE"

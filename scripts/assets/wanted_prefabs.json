@@ -1,0 +1,21 @@
+[
+  { "table": "building_desc", "field": "model_asset_name", "prefix": "Prefabs" },
+  { "table": "placeable_desc", "field": "model_asset_name", "prefix": "Prefabs" },
+  { "table": "cargo_desc", "field": "model_asset_name", "prefix": "Prefabs" },
+  { "table": "cargo_desc", "field": "carried_model_asset_name", "prefix": "Prefabs" },
+  { "table": "deployable_desc", "field": "model_address", "prefix": "Prefabs" },
+  { "table": "deployable_appearance_override_desc", "field": "model_address", "prefix": "Prefabs" },
+  { "table": "deployable_appearance_override_desc", "field": "affected_model_address", "prefix": "Prefabs" },
+  { "table": "enemy_desc", "field": "prefab_address", "prefix": "Prefabs" },
+  { "table": "npc_desc", "field": "prefab_address", "prefix": "Prefabs" },
+  { "table": "loot_chest_desc", "field": "prefab_address", "prefix": "Prefabs" },
+  { "table": "paving_tile_desc", "field": "prefab_address", "prefix": "Prefabs" },
+  { "table": "interior_instance_desc", "field": "interior_model", "prefix": "Interiors" },
+  { "table": "wall_desc", "field": "large_post_asset_name", "prefix": "" },
+  { "table": "wall_desc", "field": "small_post_asset_name", "prefix": "" },
+  { "table": "wall_desc", "field": "wall_asset_names", "prefix": "" },
+  { "table": "gate_desc", "field": "small_post_asset_name", "prefix": "" },
+  { "table": "elevator_desc", "field": "basket_address", "prefix": "" },
+  { "table": "elevator_desc", "field": "bottom_platform_address", "prefix": "" },
+  { "table": "elevator_desc", "field": "top_platform_address", "prefix": "" }
+]
