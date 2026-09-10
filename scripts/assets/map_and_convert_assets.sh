@@ -38,10 +38,28 @@ ASSET_MAP=$(jq -r '.[]' "$GAMEDATA_PATHS_FILE" | while read -r NAME; do
         end'
 done | jq -s 'add')
 
-# Step 2: Convert assets using cwebp
+# Step 2: Convert assets using cwebp, skipping any whose source content hasn't changed since the
+# last run. The manifest lives inside the publish checkout so it's committed alongside the
+# outputs it describes and is available on the next run.
+MANIFEST_FILE="publish/manifest_sprites.json"
+HASHES_FILE="sprite_hashes.tsv"
+: > "$HASHES_FILE" # truncate/create
+
+declare -A PREV_HASHES
+if [ -f "$MANIFEST_FILE" ]; then
+    while IFS=$'\t' read -r NAME HASH; do
+        PREV_HASHES["$NAME"]="$HASH"
+    done < <(jq -r 'to_entries[] | "\(.key)\t\(.value)"' "$MANIFEST_FILE")
+fi
+
 echo "$ASSET_MAP" | jq -r 'to_entries[] | "\(.key)\t\(.value)"' | while IFS=$'\t' read -r ASSET NAME; do
     FULL_PATH="$EXTRACTED_DIR/$ASSET"
     if [ -f "$FULL_PATH" ]; then
+        HASH=$(sha1sum "$FULL_PATH" | cut -d ' ' -f1)
+        echo -e "$NAME\t$HASH" >> "$HASHES_FILE"
+        if [ "${PREV_HASHES[$NAME]}" == "$HASH" ] && [ -f "$CONVERTED_DIR/$NAME.webp" ]; then
+            continue
+        fi
         OUTPUT_DIR="$CONVERTED_DIR/$(dirname "$NAME")"
         mkdir -p "$OUTPUT_DIR"
         "$CWEBP_PATH" -lossless "$FULL_PATH" -o "$CONVERTED_DIR/$NAME.webp"
@@ -49,6 +67,10 @@ echo "$ASSET_MAP" | jq -r 'to_entries[] | "\(.key)\t\(.value)"' | while IFS=$'\t
         echo "File not found: $FULL_PATH"
     fi
 done
+
+jq -R -n '[inputs | split("\t") | {(.[0]): .[1]}] | add // {}' "$HASHES_FILE" > "$MANIFEST_FILE.tmp"
+mv "$MANIFEST_FILE.tmp" "$MANIFEST_FILE"
+rm -f "$HASHES_FILE"
 
 # Step 3: Copy other assets that don't come from game data mappings
 

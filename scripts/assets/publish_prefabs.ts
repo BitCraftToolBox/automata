@@ -23,6 +23,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { execFileSync } from "child_process";
 import * as os from "os";
+import * as crypto from "crypto";
 
 const workspaceDir = path.resolve(__dirname, "../../workspace/assets");
 const gameDataDir = path.join(workspaceDir, "game-data/static");
@@ -99,7 +100,21 @@ function compress(sourcePath: string, destPath: string, tmpDir: string) {
   fs.rmSync(afterWebp, { force: true });
 }
 
+function hashFile(filePath: string): string {
+  return crypto.createHash("sha1").update(fs.readFileSync(filePath)).digest("hex");
+}
+
+// Manifest lives inside the BitCraft_Models checkout so it's committed alongside the outputs it
+// describes and is available on the next run, to skip re-running compression (webp + meshopt) on
+// files whose ripped source hasn't changed since the last run.
+const manifestFile = path.join(outputDir, "manifest_prefabs.json");
+const prevHashes: Record<string, string> = fs.existsSync(manifestFile)
+  ? JSON.parse(fs.readFileSync(manifestFile, "utf8"))
+  : {};
+const nextHashes: Record<string, string> = {};
+
 let copied = 0;
+let unchanged = 0;
 let missingOnDisk = 0;
 let compressFailed = 0;
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "publish-prefabs-"));
@@ -115,9 +130,16 @@ for (const [value, internalId] of resolved) {
   }
 
   const outputPath = path.join(outputDir, `${value}.glb`);
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-
   const sourcePath = path.join(extractedPrefabDir, rippedName);
+  const hash = hashFile(sourcePath);
+
+  if (prevHashes[value] === hash && fs.existsSync(outputPath)) {
+    nextHashes[value] = hash;
+    unchanged++;
+    continue;
+  }
+
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   try {
     compress(sourcePath, outputPath, tmpDir);
   } catch (err) {
@@ -125,6 +147,7 @@ for (const [value, internalId] of resolved) {
     fs.copyFileSync(sourcePath, outputPath);
     compressFailed++;
   }
+  nextHashes[value] = hash;
   copied++;
   if (copied % 100 === 0) {
     console.log(`Copied ${copied} / ${totalResolved}.`);
@@ -132,9 +155,10 @@ for (const [value, internalId] of resolved) {
 }
 
 fs.rmSync(tmpDir, { recursive: true, force: true });
+fs.writeFileSync(manifestFile, JSON.stringify(nextHashes, null, 2) + "\n");
 
 console.log(`Resolved ${resolved.size} unique prefabs from game data.`);
-console.log(`Copied ${copied} .glb files to ${outputDir}.`);
+console.log(`Copied ${copied} .glb files to ${outputDir} (${unchanged} unchanged, skipped).`);
 if (compressFailed > 0) {
   console.warn(`${compressFailed} files were copied uncompressed after a compression failure.`);
 }
