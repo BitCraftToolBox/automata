@@ -137,7 +137,7 @@ jobs:
       - name: Install asset script dependencies
         if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
         working-directory: scripts/assets
-        run: npm install
+        run: npm ci
 
       - name: Publish prefabs
         if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'

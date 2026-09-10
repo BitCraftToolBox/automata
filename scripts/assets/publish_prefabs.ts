@@ -103,6 +103,7 @@ let copied = 0;
 let missingOnDisk = 0;
 let compressFailed = 0;
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "publish-prefabs-"));
+const totalResolved = resolved.size;
 
 for (const [value, internalId] of resolved) {
   const base = path.basename(internalId, path.extname(internalId));
@@ -125,6 +126,9 @@ for (const [value, internalId] of resolved) {
     compressFailed++;
   }
   copied++;
+  if (copied % 100 === 0) {
+    console.log(`Copied ${copied} / ${totalResolved}.`);
+  }
 }
 
 fs.rmSync(tmpDir, { recursive: true, force: true });
