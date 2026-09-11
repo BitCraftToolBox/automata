@@ -4,11 +4,18 @@ import {spawn} from 'child_process';
 import {EOL} from 'os';
 import {request} from 'http';
 import path from 'path';
+import fs from 'fs';
 
 const workspaceDir = path.resolve(import.meta.dirname, '../../workspace/assets');
 const assetRipperPath = path.join(workspaceDir, 'AssetRipper.GUI.Free');
 const assetFolderPath = path.join(workspaceDir, 'depots/3454651');
 const outPath = path.join(workspaceDir, 'extracted');
+// Full Unity Project (YAML .asset/.meta) export, run after the primary content export finishes.
+// Needed only to resolve GUID references baked into MonoBehaviour-derived ScriptableObjects
+// (e.g. ResourceModels) that AssetRipper's primary content export can't convert on its own -- see
+// the comment at the top of publish_resources.ts. Much larger and slower than the primary export;
+// publish_resources.ts deletes it once it has read what it needs.
+const unityProjectOutPath = path.join(workspaceDir, 'extracted-project');
 
 
 let port;
@@ -60,6 +67,17 @@ const stdoutActions = [
     {
         match: /Export : Finished exporting primary content/,
         action: () => {
+            console.log('Finished extracting primary content.');
+            console.log(`Exporting Unity project to ${unityProjectOutPath}`);
+            // A leftover non-empty directory here would make AssetRipper wait on a deletion
+            // confirmation prompt it has no headless way to answer, hanging the job forever.
+            fs.rmSync(unityProjectOutPath, {recursive: true, force: true});
+            exportUnityProject(port, unityProjectOutPath);
+        }
+    },
+    {
+        match: /Export : Finished post-export/,
+        action: () => {
             console.log('Finished extracting files.');
             process.exit(0);
         }
@@ -84,6 +102,11 @@ async function loadFolder(port, folderPath) {
 async function exportPrimaryContent(port, outputFolderPath) {
     const body = new URLSearchParams({path: outputFolderPath});
     post(port, '/Export/PrimaryContent', body);
+}
+
+async function exportUnityProject(port, outputFolderPath) {
+    const body = new URLSearchParams({path: outputFolderPath});
+    post(port, '/Export/UnityProject', body);
 }
 
 function post(port, path, body) {

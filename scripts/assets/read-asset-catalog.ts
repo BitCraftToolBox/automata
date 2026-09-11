@@ -188,3 +188,33 @@ for (const b of buckets) {
 }
 
 fs.writeFileSync(prefabsOutputFile, JSON.stringify(prefabs, null, 2));
+
+// Resources: collect every ResourceModels-typed catalog entry, keyed by its full catalog key
+// (e.g. "ScriptableObjects/Resources/Sticks"). The internalId is the asset's actual project path
+// (e.g. "Assets/_Project/StaticAssets/_AddressedAssets/Prefabs/GameResources/Sticks.asset") --
+// this is the only reliable way to find a resource's ResourceModels .asset: its addressable name
+// (the catalog key, matching resource_desc.model_asset_name) frequently does *not* match the
+// asset file's own basename (e.g. key ".../T9Baitfish" -> file "SchoolOfT9Baitfish.asset"; key
+// ".../ResourceSharedOreT1Small" -> file "ResourcesSharedOreT1Small.asset"), so a name-based
+// folder search (what an earlier version of publish_resources.ts did) silently misses these.
+const resourcesOutputFile = "resources.json";
+const resources: Record<string, string> = {};
+for (const b of buckets) {
+  const k = keyByOffset.get(b.keyOffset);
+  if (!k) continue;
+
+  const keyStr = String(k.value);
+
+  for (const entryIndex of b.entryIndices) {
+    const e = entries[entryIndex];
+    if (!e) continue;
+
+    const rType = typeName(json, e.resourceTypeIndex);
+    if (rType !== "ResourceModels") continue;
+
+    const internalId = json.m_InternalIds[e.internalIdIndex];
+    resources[keyStr] = internalId;
+  }
+}
+
+fs.writeFileSync(resourcesOutputFile, JSON.stringify(resources, null, 2));

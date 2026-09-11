@@ -4,6 +4,7 @@ set -e
 
 WANTED_SPRITES_FILE="wanted_sprites.json"
 WANTED_PREFABS_FILE="wanted_prefabs.json"
+WANTED_RESOURCES_FILE="wanted_resources.json"
 GAME_DATA_DIR="game-data/static"
 GAMEDATA_PATHS_SPRITES_FILE="gamedata_paths_sprites.json"
 GAMEDATA_PATHS_PREFABS_FILE="gamedata_paths_prefabs.json"
@@ -37,9 +38,13 @@ jq -n --slurpfile wanted "$WANTED_SPRITES_FILE" \
     done \
     | sort -u | jq -R . | jq -s 'sort' > "$GAMEDATA_PATHS_SPRITES_FILE"
 
-# Prefabs: wanted_prefabs.json is [{table, field, prefix}], several fields per table.
-jq -c '.[]' "$WANTED_PREFABS_FILE" \
-    | while read -r MAP; do
+# Prefabs + resources: wanted_prefabs.json and wanted_resources.json are both
+# [{table, field, prefix}]. Resources are folded into the same cache-key file as prefabs since
+# it's only used to invalidate a cache key, not read back for its own resolution logic.
+{
+    jq -c '.[]' "$WANTED_PREFABS_FILE"
+    if [ -f "$WANTED_RESOURCES_FILE" ]; then jq -c '.[]' "$WANTED_RESOURCES_FILE"; fi
+} | while read -r MAP; do
         TABLE=$(echo "$MAP" | jq -r '.table')
         FIELD=$(echo "$MAP" | jq -r '.field')
         extract_values "$GAME_DATA_DIR/$TABLE.json" "$FIELD"
