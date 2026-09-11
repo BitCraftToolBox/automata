@@ -42,4 +42,4 @@ runs:
       working-directory: workspace/assets
       shell: bash
       run: |
-        find extracted -name "*.png" | sort > extracted_pngs.txt
+        find extracted-project/ExportedProject -name "*.png" | sort > extracted_pngs.txt

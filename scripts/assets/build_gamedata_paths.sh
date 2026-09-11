@@ -4,6 +4,9 @@ set -e
 
 WANTED_SPRITES_FILE="wanted_sprites.json"
 WANTED_PREFABS_FILE="wanted_prefabs.json"
+WANTED_RESOURCES_FILE="wanted_resources.json"
+WANTED_CUSTOMIZATION_FILE="wanted_customization.json"
+WANTED_HEXTILES_FILE="wanted_hextiles.json"
 GAME_DATA_DIR="game-data/static"
 GAMEDATA_PATHS_SPRITES_FILE="gamedata_paths_sprites.json"
 GAMEDATA_PATHS_PREFABS_FILE="gamedata_paths_prefabs.json"
@@ -37,9 +40,16 @@ jq -n --slurpfile wanted "$WANTED_SPRITES_FILE" \
     done \
     | sort -u | jq -R . | jq -s 'sort' > "$GAMEDATA_PATHS_SPRITES_FILE"
 
-# Prefabs: wanted_prefabs.json is [{table, field, prefix}], several fields per table.
-jq -c '.[]' "$WANTED_PREFABS_FILE" \
-    | while read -r MAP; do
+# Models: every field in the wanted_{prefabs,resources,customization,hextiles}.json lists plus the
+# equipment GUID field publish_equipment.ts reads. The file is only hashed for a cache key, never read
+# back, so row filters such as `where` are ignored.
+{
+    jq -c '.[]' "$WANTED_PREFABS_FILE"
+    if [ -f "$WANTED_RESOURCES_FILE" ]; then jq -c '.[]' "$WANTED_RESOURCES_FILE"; fi
+    if [ -f "$WANTED_CUSTOMIZATION_FILE" ]; then jq -c '.[]' "$WANTED_CUSTOMIZATION_FILE"; fi
+    if [ -f "$WANTED_HEXTILES_FILE" ]; then jq -c '.[]' "$WANTED_HEXTILES_FILE"; fi
+    echo '{"table": "equipment_desc", "field": "hand_equipment_visual.prefab_names"}'
+} | while read -r MAP; do
         TABLE=$(echo "$MAP" | jq -r '.table')
         FIELD=$(echo "$MAP" | jq -r '.field')
         extract_values "$GAME_DATA_DIR/$TABLE.json" "$FIELD"

@@ -1,0 +1,19 @@
+{
+  // Editor/typecheck config only: the scripts run through tsx, which doesn't read this.
+  // package.json has no "type": "module", so under nodenext these files are CommonJS
+  // (relative imports need no extensions, __dirname works).
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2022"],
+    "types": ["node"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noEmit": true
+  },
+  "include": ["*.ts", "lib/**/*.ts"],
+  "exclude": ["node_modules"]
+}

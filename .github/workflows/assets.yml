@@ -92,6 +92,9 @@ jobs:
         run: |
           cp ../../scripts/assets/wanted_sprites.json .
           cp ../../scripts/assets/wanted_prefabs.json .
+          cp ../../scripts/assets/wanted_resources.json .
+          cp ../../scripts/assets/wanted_customization.json .
+          cp ../../scripts/assets/wanted_hextiles.json .
           chmod +x ../../scripts/assets/build_gamedata_paths.sh
           ../../scripts/assets/build_gamedata_paths.sh
       - name: Cache game data paths
@@ -127,6 +130,17 @@ jobs:
 
       # --- Step 4: Build asset map and convert ---
 
+      - name: Install asset script dependencies
+        if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
+        working-directory: scripts/assets
+        run: npm ci
+
+      # Atlased UI sprites have no PNG of their own; cut them out of the atlases next to their .asset.
+      - name: Slice sprite atlases
+        if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
+        working-directory: workspace/assets
+        run: npm exec tsx ../../scripts/assets/slice_atlases.ts
+
       - name: Map and convert assets
         if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
         working-directory: workspace/assets
@@ -157,15 +171,40 @@ jobs:
           path: workspace/assets/models
           token: ${{ secrets.ACTIONS_TOKEN }}
 
-      - name: Install asset script dependencies
-        if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
-        working-directory: scripts/assets
-        run: npm ci
-
       - name: Publish prefabs
         if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
         working-directory: workspace/assets
         run: npm exec tsx ../../scripts/assets/publish_prefabs.ts
+
+      - name: Publish resources
+        if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
+        working-directory: workspace/assets
+        run: npm exec tsx ../../scripts/assets/publish_resources.ts
+
+      - name: Publish customization
+        if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
+        working-directory: workspace/assets
+        run: npm exec tsx ../../scripts/assets/publish_customization.ts
+
+      - name: Publish equipment
+        if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
+        working-directory: workspace/assets
+        run: npm exec tsx ../../scripts/assets/publish_equipment.ts
+
+      - name: Publish hex tile templates
+        if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
+        working-directory: workspace/assets
+        run: npm exec tsx ../../scripts/assets/publish_hextiles.ts
+
+      - name: Build models index
+        if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'
+        working-directory: workspace/assets
+        run: npm exec tsx ../../scripts/assets/publish_models_index.ts
+
+      # The Unity Project export is large and only needed by the publishers above.
+      - name: Remove Unity Project export
+        if: always()
+        run: rm -rf workspace/assets/extracted-project
 
       - name: Commit and push prefab models
         if: steps.manifest-cache.outputs.cache-hit != 'true' || steps.gamedata-paths-cache.outputs.cache-hit != 'true'

@@ -4,12 +4,18 @@ import * as fs from "fs";
 import * as path from "path";
 
 const workspaceDir = path.resolve(__dirname, '../../workspace/assets');
-const assetFolderPath = path.join(workspaceDir, 'depots/3454651');
-const build = String(fs.readdirSync(assetFolderPath, { recursive: false })[0]);
-const catalog = path.join(assetFolderPath, build, 'BitCraft_Data', 'StreamingAssets', 'aa', 'catalog.json');
 
-const outputFile = "sprites.json";
-fs.writeFileSync(path.join(workspaceDir, 'publish/build'), build);
+// CATALOG_FILE points this at an arbitrary catalog.json (e.g. a local Steam install) for local
+// runs; outputs are still written to the cwd, and the build id isn't recorded.
+let catalog: string;
+if (process.env.CATALOG_FILE) {
+  catalog = process.env.CATALOG_FILE;
+} else {
+  const assetFolderPath = path.join(workspaceDir, 'depots/3454651');
+  const build = String(fs.readdirSync(assetFolderPath, { recursive: false })[0]);
+  catalog = path.join(assetFolderPath, build, 'BitCraft_Data', 'StreamingAssets', 'aa', 'catalog.json');
+  fs.writeFileSync(path.join(workspaceDir, 'publish/build'), build);
+}
 
 class Reader {
   buf: Buffer;
@@ -127,64 +133,56 @@ const { keyByOffset } = parseKeyData(keyBuf);
 const buckets = parseBucketData(bucketBuf);
 const entries = parseEntryData(entryBuf);
 
-let all: Map<string, string> = new Map();
-for (const b of buckets) {
-  const k = keyByOffset.get(b.keyOffset);
-  if (!k) continue;
-
-  const keyStr = String(k.value);
-  if (!keyStr.toLowerCase().startsWith("sprites/")) continue;
-
-  for (const entryIndex of b.entryIndices) {
-    const e = entries[entryIndex];
-    if (!e) continue;
-
-    const internalId = json.m_InternalIds[e.internalIdIndex];
-    const rType = typeName(json, e.resourceTypeIndex);
-
-    if (!rType.toLowerCase().includes("sprite")) {
-      continue;
+// Every (catalog key, entry) pair with its resource type name.
+function* catalogEntries(): Generator<{ key: string; internalId: string; type: string }> {
+  for (const b of buckets) {
+    const k = keyByOffset.get(b.keyOffset);
+    if (!k) continue;
+    for (const entryIndex of b.entryIndices) {
+      const e = entries[entryIndex];
+      if (!e) continue;
+      yield { key: String(k.value), internalId: json.m_InternalIds[e.internalIdIndex], type: typeName(json, e.resourceTypeIndex) };
     }
-    const offset = "sprites/".length;
-    // name -> path
-    all[keyStr.substring(offset)] = internalId;
-
   }
 }
 
-// ensure that paths are also unique when mapped to names
+// Sprites: sprite name (the key after "sprites/") -> internalId.
+const sprites: Record<string, string> = {};
+for (const { key, internalId, type } of catalogEntries()) {
+  if (!key.toLowerCase().startsWith("sprites/") || !type.toLowerCase().includes("sprite")) continue;
+  sprites[key.substring("sprites/".length)] = internalId;
+}
+
+// Names must stay unique when mapped to paths.
 const reversedMap = new Map<string, string>();
-for (const [key, value] of Object.entries(all)) {
+for (const [key, value] of Object.entries(sprites)) {
   if (reversedMap.has(value)) {
     throw new Error(`Duplicate value detected when reversing the map: ${value} is mapped to multiple keys (${reversedMap.get(value)} and ${key})`);
   }
   reversedMap.set(value, key);
 }
 
-fs.writeFileSync(outputFile, JSON.stringify(all, null, 2));
+fs.writeFileSync("sprites.json", JSON.stringify(sprites, null, 2));
 
-// Prefabs: collect every GameObject-typed catalog entry, keyed by its full catalog key.
-// Unlike sprites, prefab keys don't share one namespace (Prefabs/Category/Name, Interiors/Name,
-// bare GUIDs, bare addressable names like "Bushes/SticksDeplete" all show up), so we keep the
-// full key here and let callers prepend whatever prefix their game-data field needs.
-const prefabsOutputFile = "prefabs.json";
+// Prefabs: full catalog key -> internalId for every GameObject entry. Keys don't share one namespace
+// (Prefabs/Category/Name, Interiors/Name, bare GUIDs, ...), so callers prepend their own prefix.
 const prefabs: Record<string, string> = {};
-for (const b of buckets) {
-  const k = keyByOffset.get(b.keyOffset);
-  if (!k) continue;
-
-  const keyStr = String(k.value);
-
-  for (const entryIndex of b.entryIndices) {
-    const e = entries[entryIndex];
-    if (!e) continue;
-
-    const rType = typeName(json, e.resourceTypeIndex);
-    if (rType !== "UnityEngine.GameObject") continue;
-
-    const internalId = json.m_InternalIds[e.internalIdIndex];
-    prefabs[keyStr] = internalId;
-  }
+// ScriptableObjects read through their own serialized fields: full catalog key -> { id, type }.
+// Includes the bare-GUID duplicates of the same entries (equipment_desc stores GUIDs).
+const SCRIPTABLE_OBJECT_TYPES = new Set([
+  "ResourceModels",
+  "BodyPart",
+  "HairPart",
+  "AttachmentPart",
+  "VariantList",
+  "EquipmentMeshAndMaterials",
+  "BitCraft.Tools.HexTileTemplate",
+]);
+const scriptableObjects: Record<string, { id: string; type: string }> = {};
+for (const { key, internalId, type } of catalogEntries()) {
+  if (type === "UnityEngine.GameObject") prefabs[key] = internalId;
+  else if (SCRIPTABLE_OBJECT_TYPES.has(type)) scriptableObjects[key] = { id: internalId, type };
 }
 
-fs.writeFileSync(prefabsOutputFile, JSON.stringify(prefabs, null, 2));
+fs.writeFileSync("prefabs.json", JSON.stringify(prefabs, null, 2));
+fs.writeFileSync("scriptable_objects.json", JSON.stringify(scriptableObjects, null, 2));
