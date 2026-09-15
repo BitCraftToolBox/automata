@@ -1,8 +1,8 @@
 [submodule "bsatn-script-bindings"]
 	path = scripts/bsatn/bindings
 	url = https://github.com/BitCraftToolBox/BitCraft_Bindings
-	branch = ts-region
+	branch = ts-region-2
 [submodule "cs-script-bindings"]
 	path = scripts/cereal-cs/bindings
 	url = https://github.com/BitCraftToolBox/BitCraft_Bindings
-	branch = cs-region
+	branch = cs-region-2

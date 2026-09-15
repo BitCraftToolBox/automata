@@ -1,5 +1,5 @@
 import {DbConnection, REMOTE_MODULE} from './bindings/src'
-import {AlgebraicType, BinaryWriter} from "@clockworklabs/spacetimedb-sdk";
+import {AlgebraicType, BinaryWriter} from "spacetimedb";
 import * as fs from "node:fs";
 
 fs.existsSync('../../.env.local') && require('dotenv').config({path: '../../.env.local'});
@@ -8,17 +8,9 @@ const data_dir = process.env.DATA_DIR || "../../workspace/data/bsatn/static";
 
 !fs.existsSync(data_dir) && fs.mkdirSync(data_dir, {recursive: true});
 
-const snakeToCamel = (str: string) =>
-    str.toLowerCase().replace(/([-_][a-z])/g, group =>
-        group
-            .toUpperCase()
-            .replace('_', '')
-    );
-
-type KeyType = keyof typeof REMOTE_MODULE.tables;
 type KeyPair = {
     camel: string;
-    snake: KeyType;
+    snake: string;
 }
 
 interface SchemaResponse {
@@ -56,29 +48,22 @@ function isStaticTable(tbl: { name: string; table_access: Record<'Public' | 'Pri
 const createOnConnect = (subscriptions: string[], mappings: Map<KeyPair, AlgebraicType>) =>
     (conn: DbConnection) => {
         conn.subscriptionBuilder().onApplied(() => {
-            // @ts-ignore - tsconfig targets es2016+ already, not sure what's tripping up mappings.entries() iteration
             for (let [{camel, snake}, st_type] of mappings.entries()) {
                 const table: any = conn.db[camel as keyof typeof conn.db];
                 const bw = new BinaryWriter(1024 * 1024);
                 let array: any[];
                 if (snake === 'building_function_type_mapping_desc') {
-                    array = Array.from(table.iter(), (o) => {
-                        o['descIds'] = o['descIds'].sort((a, b) => a - b);
+                    array = Array.from(table.iter(), (o: any) => {
+                        o['descIds'] = o['descIds'].sort((a: number, b: number) => a - b);
                         return o;
                     });
                 } else {
                     array = Array.from(table.iter());
                 }
-                // if (array.length) {
-                //     const pk = REMOTE_MODULE.tables[snake].primaryKey;
-                //     if (pk) {
-                //         array.sort((a, b) => {
-                //             return a[pk] - b[pk];
-                //         });
-                //     }
-                // }
+                // No sort here: native table order is semantically relevant and is stable in
+                // practice (verified across separate runs), so we leave it as delivered.
 
-                st_type.serialize(bw, array);
+                AlgebraicType.makeSerializer(st_type)(bw, array);
 
                 // this is the one place we could probably write async and await on all the files at the end,
                 // but that seems like too much effort for something already quite fast
@@ -97,34 +82,39 @@ const createOnConnect = (subscriptions: string[], mappings: Map<KeyPair, Algebra
 
 
 async function main() {
+    const host = process.env.BITCRAFT_SPACETIME_HOST;
+    if (!host) {
+        throw new Error('BITCRAFT_SPACETIME_HOST is not set');
+    }
     let module = process.env.BITCRAFT_REGION_MODULE || 'bitcraft-2';
-    const schema: SchemaResponse = await downloadSchema(process.env.BITCRAFT_SPACETIME_HOST, module);
+    const schema: SchemaResponse = await downloadSchema(host, module);
 
     const subscriptions: string[] = [];
     const mappings = new Map<KeyPair, AlgebraicType>();
+    const moduleTables = Object.values(REMOTE_MODULE.tables);
 
     for (let schemaTable of schema.tables) {
         if (!isStaticTable(schemaTable)) {
             continue;
         }
-        const tableKey = schemaTable.name as KeyType;
-        const st_arr_type = AlgebraicType.createArrayType(REMOTE_MODULE.tables[tableKey].rowType);
-        mappings.set({camel: snakeToCamel(tableKey), snake: tableKey}, st_arr_type);
-        subscriptions.push(`SELECT * FROM ${tableKey};`)
+        const tableKey = schemaTable.name;
+        const table = moduleTables.find(t => t.sourceName === tableKey);
+        if (!table) {
+            throw new Error(`Table ${tableKey} not found in generated bindings`);
+        }
+        const st_arr_type = AlgebraicType.Array(AlgebraicType.Product(table.rowType));
+        mappings.set({camel: table.accessorName, snake: table.sourceName}, st_arr_type);
+        subscriptions.push(`SELECT * FROM ${table.sourceName};`)
     }
 
     return new Promise<void>((resolve, reject) => {
         DbConnection.builder()
-            .withUri('wss://' + process.env.BITCRAFT_SPACETIME_HOST)
-            .withModuleName(module)
+            .withUri('wss://' + host)
+            .withDatabaseName(module)
             .withToken(process.env.BITCRAFT_BEARER_TOKEN)
             .onConnect(createOnConnect(subscriptions, mappings))
             .onConnectError((_, err) => {
-                if (err['wasClean']) {
-                    resolve()
-                } else {
-                    reject(err);
-                }
+                reject(err);
             })
             .onDisconnect(() => {
                 resolve();
@@ -136,9 +126,6 @@ async function main() {
 main().then(() => {
     process.exit(0);
 }).catch(error => {
-    if (error['wasClean']) {
-        process.exit(0);
-    }
     console.error('Error:', error);
     process.exit(1);
 });
