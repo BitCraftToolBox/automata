@@ -14,10 +14,10 @@ output_dir=${DATA_DIR:-workspace/bindings}
 # Create output directory if it doesn't exist
 mkdir -p "$output_dir"
 
-curl --fail "${scheme}://${hostname}/v1/database/${global_mod}/schema?version=9" -o "${output_dir}/global_schema.json"
-curl --fail "${scheme}://${hostname}/v1/database/${region_mod}/schema?version=9" -o "${output_dir}/region_schema.json"
-curl --fail "${scheme}://${hostname}/v1/database/${global_mod}/schema?version=10" -o "${output_dir}/global_schema_v10.json"
-curl --fail "${scheme}://${hostname}/v1/database/${region_mod}/schema?version=10" -o "${output_dir}/region_schema_v10.json"
+curl --fail -L "${scheme}://${hostname}/v1/database/${global_mod}/schema?version=9" -o "${output_dir}/global_schema.json"
+curl --fail -L "${scheme}://${hostname}/v1/database/${region_mod}/schema?version=9" -o "${output_dir}/region_schema.json"
+curl --fail -L "${scheme}://${hostname}/v1/database/${global_mod}/schema?version=10" -o "${output_dir}/global_schema_v10.json"
+curl --fail -L "${scheme}://${hostname}/v1/database/${region_mod}/schema?version=10" -o "${output_dir}/region_schema_v10.json"
 
 for module in global region; do
   json="${output_dir}"/${module}_schema.json
