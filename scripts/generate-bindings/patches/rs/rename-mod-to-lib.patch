@@ -1,4 +1,0 @@
-diff --git a/src/mod.rs b/src/lib.rs
-similarity index 100%
-rename from src/mod.rs
-rename to src/lib.rs

@@ -23,7 +23,9 @@ jobs:
           path: |
             workspace/bindings/global_schema.json
             workspace/bindings/region_schema.json
-          key: schemas-${{ hashFiles('workspace/bindings/global_schema.json', 'workspace/bindings/region_schema.json') }}
+            workspace/bindings/global_schema_v10.json
+            workspace/bindings/region_schema_v10.json
+          key: schemas-${{ hashFiles('workspace/bindings/global_schema.json', 'workspace/bindings/region_schema.json', 'workspace/bindings/global_schema_v10.json', 'workspace/bindings/region_schema_v10.json') }}
       - uses: actions/checkout@v4
         if: steps.check-cache.outputs.cache-hit != 'true'
         with:
@@ -38,6 +40,8 @@ jobs:
           cd workspace/bindings/schema
           jq . ../global_schema.json > global_schema.json
           jq . ../region_schema.json > region_schema.json
+          jq . ../global_schema_v10.json > global_schema_v10.json
+          jq . ../region_schema_v10.json > region_schema_v10.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
@@ -49,75 +53,18 @@ jobs:
         if: steps.check-cache.outputs.cache-hit != 'true'
         with:
           repository: BitCraftToolBox/BitCraft_Bindings
-          path: workspace/bindings/cs/global
-          ref: cs-global
+          path: workspace/bindings/bindings-repo
           token: ${{ secrets.ACTIONS_TOKEN }}
-      - uses: actions/checkout@v4
-        if: steps.check-cache.outputs.cache-hit != 'true'
-        with:
-          repository: BitCraftToolBox/BitCraft_Bindings
-          path: workspace/bindings/cs/region
-          ref: cs-region
-          token: ${{ secrets.ACTIONS_TOKEN }}
-      - uses: actions/checkout@v4
-        if: steps.check-cache.outputs.cache-hit != 'true'
-        with:
-          repository: BitCraftToolBox/BitCraft_Bindings
-          path: workspace/bindings/ts/global
-          ref: ts-global
-          token: ${{ secrets.ACTIONS_TOKEN }}
-      - uses: actions/checkout@v4
-        if: steps.check-cache.outputs.cache-hit != 'true'
-        with:
-          repository: BitCraftToolBox/BitCraft_Bindings
-          path: workspace/bindings/ts/region
-          ref: ts-region
-          token: ${{ secrets.ACTIONS_TOKEN }}
-      - uses: actions/checkout@v4
-        if: steps.check-cache.outputs.cache-hit != 'true'
-        with:
-          repository: BitCraftToolBox/BitCraft_Bindings
-          path: workspace/bindings/rs/global
-          ref: rs-global
-          token: ${{ secrets.ACTIONS_TOKEN }}
-      - uses: actions/checkout@v4
-        if: steps.check-cache.outputs.cache-hit != 'true'
-        with:
-          repository: BitCraftToolBox/BitCraft_Bindings
-          path: workspace/bindings/rs/region
-          ref: rs-region
-          token: ${{ secrets.ACTIONS_TOKEN }}
-      - name: Remove old data
-        if: steps.check-cache.outputs.cache-hit != 'true'
-        run: rm -rf workspace/bindings/{cs,rs,ts}/{global,region}/*
-        shell: bash
       - name: Generate bindings
         if: steps.check-cache.outputs.cache-hit != 'true'
         run: |
           curl -fsSL https://install.spacetimedb.com | sh -s -- --yes
           spacetime version install 1.12.0
           spacetime version install 1.3.0
+          spacetime version install 2.10.0
           scripts/generate-bindings/make-bindings.sh
         env:
           DATA_DIR: ${{ github.workspace }}/workspace/bindings
-      - name: Push changes
-        if: steps.check-cache.outputs.cache-hit != 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
-        run: |
-          for lang in cs rs ts; do
-            for module in global region; do
-              cd workspace/bindings/$lang/$module
-              git config user.name "github-actions[bot]"
-              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-              git add -A
-              if ! git diff --cached --quiet; then
-                git commit -m "Update bindings: $(date +%Y-%m-%d)"
-                git push origin $lang-$module
-              fi
-              cd ../../../../
-            done
-          done
       - name: Update bindings for BSATN/Cereal scripts
         if: steps.check-cache.outputs.cache-hit != 'true'
         env:

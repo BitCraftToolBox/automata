@@ -1,0 +1,15 @@
+diff --git a/src/index.ts b/src/index.ts
+index a263e737..3bb578bd 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -11433,6 +11433,10 @@ export type SubscriptionHandle = __SubscriptionHandleImpl<typeof REMOTE_MODULE>;
+ export class SubscriptionBuilder extends __SubscriptionBuilderImpl<typeof REMOTE_MODULE> {}
+ 
+ /** Builder class to configure a new database connection to the remote SpacetimeDB instance. */
++// @ts-ignore - TS2589 "Type instantiation is excessively deep and possibly infinite." The
++// DbConnectionBuilder<DbConnection>/DbConnection circular generic reference used by every
++// spacetimedb-generated module apparently only blows past TS's instantiation-depth limit once
++// a schema gets as large as this one (~500 tables); smaller modules don't hit it.
+ export class DbConnectionBuilder extends __DbConnectionBuilder<DbConnection> {}
+ 
+ /** The typed database connection to manage connections to the remote SpacetimeDB instance. This class has type information specific to the generated module. */

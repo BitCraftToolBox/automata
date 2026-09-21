@@ -183,10 +183,9 @@ async Task<Dictionary<string, string>> GetStaticTableNames(string host, string m
 
 DbConnection ConnectToDatabase(CancellationTokenSource token, string host, string region, string? bearerToken, Dictionary<string, string> tables, string dataDir)
 {
-    DbConnection? conn = null;
-    conn = DbConnection.Builder()
+    var conn = DbConnection.Builder()
         .WithUri("https://" + host)
-        .WithModuleName(region)
+        .WithDatabaseName(region)
         .WithToken(bearerToken)
         .OnConnect((c, _, _) => OnConnected(c, tables, dataDir))
         .OnConnectError(OnConnectError)

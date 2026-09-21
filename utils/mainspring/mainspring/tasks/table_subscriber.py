@@ -209,6 +209,34 @@ class TableSubscriberTask(Task):
             accumulated_changes = {}
             trigger_task: Optional[asyncio.Task] = None
 
+            def accumulate_table_updates(tables_updated: list):
+                """Accumulate insert/delete counts per table into accumulated_changes"""
+                for table_update in tables_updated:
+                    table_name = table_update.get("table_name")
+                    updates = table_update.get("updates", [])
+
+                    if table_name not in accumulated_changes:
+                        accumulated_changes[table_name] = {
+                            "inserts": 0,
+                            "deletes": 0,
+                        }
+
+                    for update in updates:
+                        accumulated_changes[table_name]["inserts"] += len(update.get("inserts", []))
+                        accumulated_changes[table_name]["deletes"] += len(update.get("deletes", []))
+
+            async def reschedule_trigger():
+                """Debounce pattern: cancel previous trigger and schedule a new one.
+                Ensures we trigger after trigger_interval seconds of NO updates."""
+                nonlocal trigger_task
+                if trigger_task and not trigger_task.done():
+                    trigger_task.cancel()
+                    try:
+                        await trigger_task
+                    except asyncio.CancelledError:
+                        pass
+                trigger_task = asyncio.create_task(trigger_actions_delayed())
+
             async def trigger_actions_delayed():
                 """Delayed action trigger - waits for a quiet period before triggering"""
                 await asyncio.sleep(self.trigger_interval)
@@ -265,13 +293,7 @@ class TableSubscriberTask(Task):
                                         accumulated_changes["st_module"] = {"inserts": 0, "deletes": 0}
                                     accumulated_changes["st_module"]["deletes"] += 1
                                     accumulated_changes["st_module"]["inserts"] += 1
-                                    if trigger_task and not trigger_task.done():
-                                        trigger_task.cancel()
-                                        try:
-                                            await trigger_task
-                                        except asyncio.CancelledError:
-                                            pass
-                                    trigger_task = asyncio.create_task(trigger_actions_delayed())
+                                    await reschedule_trigger()
                                 self._st_module_program_hash = new_hash
                         continue
 
@@ -290,39 +312,23 @@ class TableSubscriberTask(Task):
                             update_count += 1
                             tables_updated = tx_update["status"]["Committed"].get("tables", [])
 
-                            # Process each table update
-                            for table_update in tables_updated:
-                                table_name = table_update.get("table_name")
-                                updates = table_update.get("updates", [])
-
-                                # Track changes per table
-                                if table_name not in accumulated_changes:
-                                    accumulated_changes[table_name] = {
-                                        "inserts": 0,
-                                        "deletes": 0,
-                                    }
-
-                                for update in updates:
-                                    inserts = update.get("inserts", [])
-                                    deletes = update.get("deletes", [])
-
-                                    # Count total inserts and deletes
-                                    accumulated_changes[table_name]["inserts"] += len(inserts)
-                                    accumulated_changes[table_name]["deletes"] += len(deletes)
+                            accumulate_table_updates(tables_updated)
 
                             self._logger.debug(f"Transaction #{update_count}: {len(tables_updated)} tables updated")
 
-                            # Debounce pattern: Cancel previous trigger and schedule new one
-                            # This ensures we trigger after trigger_interval seconds of NO updates
-                            if trigger_task and not trigger_task.done():
-                                trigger_task.cancel()
-                                try:
-                                    await trigger_task
-                                except asyncio.CancelledError:
-                                    pass
+                            await reschedule_trigger()
 
-                            # Schedule new trigger after quiet period
-                            trigger_task = asyncio.create_task(trigger_actions_delayed())
+                    # Handle TransactionUpdateLight messages (no status/failure info, always committed)
+                    elif "TransactionUpdateLight" in data:
+                        tx_update_light = data["TransactionUpdateLight"]
+                        update_count += 1
+                        tables_updated = tx_update_light.get("update", {}).get("tables", [])
+
+                        accumulate_table_updates(tables_updated)
+
+                        self._logger.debug(f"Transaction #{update_count} (light): {len(tables_updated)} tables updated")
+
+                        await reschedule_trigger()
                 except asyncio.TimeoutError:
                     # No message received, just continue
                     continue

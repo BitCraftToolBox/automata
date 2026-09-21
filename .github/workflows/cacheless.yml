@@ -1,4 +1,4 @@
-name: Update nodeindex
+name: Update cacheless bindings
 on:
   workflow_dispatch:
   schedule:
@@ -7,8 +7,6 @@ on:
 jobs:
   build-cacheless-bindings:
     runs-on: ubuntu-latest
-    outputs:
-      cache-hit: ${{ steps.check-cache.outputs.cache-hit }}
     steps:
       - uses: actions/checkout@v4
       - name: Fetch schemas
@@ -37,10 +35,14 @@ jobs:
         if: steps.check-cache.outputs.cache-hit != 'true'
         run: |
           curl -fsSL https://install.spacetimedb.com | sh -s -- --yes
-          spacetime version install 1.12.0
-          spacetime version use 1.12.0
+          spacetime version install 2.10.0
+          spacetime version use 2.10.0
           ./generate.sh
         working-directory: ${{ github.workspace }}/workspace/bindings/cacheless
+        env:
+          BITCRAFT_SPACETIME_HOST: ${{ secrets.BITCRAFT_SPACETIME_HOST }}
+          BITCRAFT_GLOBAL_MODULE: ${{ secrets.BITCRAFT_GLOBAL_MODULE }}
+          BITCRAFT_REGION_MODULE: ${{ secrets.BITCRAFT_REGION_MODULE }}
       - name: Push changes
         if: steps.check-cache.outputs.cache-hit != 'true'
         env:
@@ -54,54 +56,3 @@ jobs:
               git push origin
             fi
         working-directory: ${{ github.workspace }}/workspace/bindings/cacheless
-  build-nodeindex:
-    needs: build-cacheless-bindings
-    if: ${{ needs.build-cacheless-bindings.outputs.cache-hit != 'true' }}
-    runs-on: ubuntu-latest
-    env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: bitcrafttoolbox/bitcraftmap-api
-    permissions:
-      contents: read
-      packages: write
-      attestations: write
-      id-token: write
-    steps:
-      - name: Checkout nodeindex
-        uses: actions/checkout@v4
-        with:
-          repository: BitCraftToolBox/bitcraft-nodeindex
-          path: workspace/nodeindex
-          ref: main
-          token: ${{ secrets.ACTIONS_TOKEN }}
-      - name: Update binding repo
-        run: |
-          cargo update bindings
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m "Update bindings: $(date +%Y-%m-%d)"
-            git push origin
-          fi
-        working-directory: ${{ github.workspace }}/workspace/nodeindex
-      - name: Log in to the Container registry
-        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: BitCraftToolBox
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build and push image
-        id: push
-        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
-        with:
-          context: workspace/nodeindex
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          no-cache-filters: config
-          github-token: '${{ secrets.GITHUB_TOKEN }}'
