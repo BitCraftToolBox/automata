@@ -18,7 +18,7 @@ runs:
         STEAM_USER: ${{ inputs.steam-user }}
       shell: bash
       run: |
-        ./DepotDownloader -app 3454650 -username $STEAM_USER -remember-password -os windows -branch preview
+        /tmp/depotdownloader-bin/DepotDownloader -app 3454650 -username $STEAM_USER -remember-password -os windows -branch preview
     - name: Download AssetRipper
       working-directory: workspace/assets
       shell: bash

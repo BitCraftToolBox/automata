@@ -5,42 +5,65 @@ on:
     - cron: '37 5 * * *'
 
 jobs:
-  extract-assets:
-    runs-on: ubuntu-latest
+  steam-auth:
+    runs-on: self-hosted
+    env:
+      HOME: /tmp/depotdownloader-home
+      PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     steps:
-      - uses: actions/checkout@v4
       - name: Download DepotDownloader
         run: |
-          mkdir -p workspace/assets
-          cd workspace/assets
-          wget -qO DepotDownloader.zip https://github.com/SteamRE/DepotDownloader/releases/download/DepotDownloader_3.4.0/DepotDownloader-linux-x64.zip
-          unzip DepotDownloader.zip DepotDownloader
+          mkdir -p /tmp/depotdownloader-bin
+          wget -qO /tmp/DepotDownloader.zip https://github.com/SteamRE/DepotDownloader/releases/download/DepotDownloader_3.4.0/DepotDownloader-linux-x64.zip
+          unzip -o /tmp/DepotDownloader.zip -d /tmp/depotdownloader-bin DepotDownloader
+          chmod +x /tmp/depotdownloader-bin/DepotDownloader
       - name: Steam auth cache
         id: auth-cache
         uses: actions/cache@v4
         with:
-          path: ~/.local/share/IsolatedStorage
+          path: /tmp/depotdownloader-home/.local/share/IsolatedStorage
           key: steamauth
       - name: Steam auth
         if: steps.auth-cache.outputs.cache-hit != 'true'
-        working-directory: workspace/assets
         run: |
-          ./DepotDownloader -app 3454650 -qr -remember-password -os windows -branch preview -manifest-only
+          /tmp/depotdownloader-bin/DepotDownloader -app 3454650 -qr -remember-password -os windows -branch preview -manifest-only
       - uses: actions/cache/save@v5
         if: steps.auth-cache.outputs.cache-hit != 'true'
         id: save-auth-cache
         with:
-          path: ~/.local/share/IsolatedStorage
+          path: /tmp/depotdownloader-home/.local/share/IsolatedStorage
           key: steamauth
+
+  extract-assets:
+    needs: steam-auth
+    runs-on: ubuntu-latest
+    env:
+      HOME: /tmp/depotdownloader-home
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download DepotDownloader
+        run: |
+          mkdir -p /tmp/depotdownloader-bin
+          wget -qO /tmp/DepotDownloader.zip https://github.com/SteamRE/DepotDownloader/releases/download/DepotDownloader_3.4.0/DepotDownloader-linux-x64.zip
+          unzip -o /tmp/DepotDownloader.zip -d /tmp/depotdownloader-bin DepotDownloader
+          chmod +x /tmp/depotdownloader-bin/DepotDownloader
+      - name: Restore Steam auth cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/depotdownloader-home/.local/share/IsolatedStorage
+          key: steamauth
+          fail-on-cache-miss: true
 
       # --- Step 1: Check client manifest; if new, download and extract immediately ---
 
+      - name: Create workspace directory
+        run: mkdir -p workspace/assets
       - name: Check depot manifest
         working-directory: workspace/assets
         env:
           STEAM_USER: ${{ secrets.STEAM_USER }}
         run: |
-          ./DepotDownloader -app 3454650 -username $STEAM_USER -remember-password -os windows -branch preview -manifest-only \
+          /tmp/depotdownloader-bin/DepotDownloader -app 3454650 -username $STEAM_USER -remember-password -os windows -branch preview -manifest-only \
           | grep Manifest | cut -d " " -f 2 > manifest.txt
       - name: Cache depot manifest
         id: manifest-cache
