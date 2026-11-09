@@ -7,7 +7,7 @@ SPRITES_FILE="sprites.json"
 CONVERTED_DIR="publish/sprites"
 
 if true; then
-  EXTRACTED_DIR="extracted"
+  EXTRACTED_DIR="extracted-project/ExportedProject"
   WEBP_TOOLS_URL="https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.6.0-linux-x86-64.tar.gz"
   WEBP_TOOLS_DIR="libwebp-1.6.0-linux-x86-64"
   curl -O "$WEBP_TOOLS_URL"
@@ -74,35 +74,37 @@ rm -f "$HASHES_FILE"
 
 # Step 3: Copy other assets that don't come from game data mappings
 
-# Extra UI elements that aren't referenced by game data but are useful for building game-like UI elements
-# TODO deal with atlases
-#declare -A EXTRA_PNG_CONVERSION_MAP=(
-#    ["Assets/_Project/StaticAssets/_AddressedAssets/Sprites/Randy UI/Atlased/Small/Entities/"]="UI/Frames"
-#    ["Assets/_Project/StaticAssets/_AddressedAssets/Sprites/Randy UI/Atlased/Small/Badges/"]="UI/Badges"
-#)
-#
-#echo "Converting extra UI elements."
-#for source_dir in "${!EXTRA_PNG_CONVERSION_MAP[@]}"; do
-#    target_dir="${EXTRA_PNG_CONVERSION_MAP[$source_dir]}"
-#    mkdir -p "publish/$target_dir"
-#    echo "\"$EXTRACTED_DIR/${source_dir}\" -> \"publish/${target_dir}\""
-#    for f in "$EXTRACTED_DIR/$source_dir"/*.png; do
-#        if [ ! -e "$f" ]; then
-#          echo "Expected files in extra asset directory, but none found: $source_dir."
-#          continue
-#        fi
-#        name=$(basename "$f" .png)
-#        output="publish/$target_dir/${name}.webp"
-#        "$CWEBP_PATH" -lossless "$f" -o "$output"
-#    done
-#done
+# Extra UI elements that aren't referenced by game data but are useful for building game-like UI
+# elements. These live in atlases; slice_atlases.ts cut them out to PNGs next to their Sprite assets.
+declare -A EXTRA_PNG_CONVERSION_MAP=(
+    ["Assets/_Project/StaticAssets/_AddressedAssets/Sprites/Randy UI/Atlased/Small/Entities/"]="UI/Frames"
+    ["Assets/_Project/StaticAssets/_AddressedAssets/Sprites/Randy UI/Atlased/Small/Badges/"]="UI/Badges"
+)
+
+echo "Converting extra UI elements."
+for source_dir in "${!EXTRA_PNG_CONVERSION_MAP[@]}"; do
+    target_dir="${EXTRA_PNG_CONVERSION_MAP[$source_dir]}"
+    mkdir -p "publish/$target_dir"
+    echo "\"$EXTRACTED_DIR/${source_dir}\" -> \"publish/${target_dir}\""
+    for f in "$EXTRACTED_DIR/$source_dir"/*.png; do
+        if [ ! -e "$f" ]; then
+          echo "Expected files in extra asset directory, but none found: $source_dir."
+          continue
+        fi
+        name=$(basename "$f" .png)
+        # The tier number badges are 40x40 images that brico layers over badge-tier-container at the
+        # same size; the atlas holds bare digit glyphs instead, so the published ones stay as they are.
+        case "$name" in badge-tier-number-*) continue ;; esac
+        output="publish/$target_dir/${name}.webp"
+        "$CWEBP_PATH" -lossless "$f" -o "$output"
+    done
+done
 
 # translation files
 echo "Copying translation files."
 mkdir -p "publish/I18N"
-for f in "$EXTRACTED_DIR"/Assets/_Project/StaticAssets/_AddressedAssets/I18N/*.bytes; do
-    name="$(basename "$f")"
-    cp -- "$f" "publish/I18N/${name%.bytes}.csv"
+for f in "$EXTRACTED_DIR"/Assets/_Project/StaticAssets/_AddressedAssets/I18N/*.csv; do
+    cp -- "$f" "publish/I18N/$(basename "$f")"
 done
 
 # font icon files

@@ -1,6 +1,12 @@
 {
   "devDependencies": {
-    "@gltf-transform/cli": "^4.5.0",
-    "@types/node": "^25.3.0"
+    "@gltf-transform/core": "^4.5.0",
+    "@gltf-transform/extensions": "^4.5.0",
+    "@gltf-transform/functions": "^4.5.0",
+    "@types/node": "^25.3.0",
+    "meshoptimizer": "^1.2.0",
+    "sharp": "^0.35.4",
+    "tsx": "^4.23.15",
+    "yaml": "^2.9.1"
   }
 }
