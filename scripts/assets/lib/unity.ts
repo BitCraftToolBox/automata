@@ -98,6 +98,22 @@ export function readUnityYaml(file: string, { cache = true } = {}): UnityObject[
   return objects;
 }
 
+/**
+ * Canonical form of a Unity YAML file for fingerprinting. AssetRipper makes up new GUIDs on every
+ * export and numbers the objects inside a prefab differently each time, so the same game data
+ * would otherwise hash differently on every run. GUIDs are masked (the files they point to are
+ * fingerprinted on their own) and long object ids are renumbered by document order. Short ids
+ * (`4300000`, `2100000`, ...) are class-based and stay.
+ */
+export function canonicalUnityYaml(text: string): string {
+  const ids = new Map<string, number>();
+  for (const m of text.matchAll(/^--- !u!\d+ &(-?\d{12,})/gm)) if (!ids.has(m[1])) ids.set(m[1], ids.size);
+  // A reference into another file names an object of that file by its (equally made-up) id.
+  const masked = text.replace(/fileID: -?\d{12,}, guid: [0-9a-f]{32}/g, "fileID: _, guid: _").replace(/guid: [0-9a-f]{32}/g, "guid: _");
+  if (!ids.size) return masked;
+  return masked.replace(/(&|fileID: )(-?\d{12,})\b/g, (all, prefix: string, id: string) => (ids.has(id) ? `${prefix}#${ids.get(id)}` : all));
+}
+
 /** The single MonoBehaviour (ScriptableObject) payload of a `.asset` file. */
 export function readScriptableObject(file: string): any {
   const obj = readUnityYaml(file).find((o) => o.type === "MonoBehaviour");

@@ -361,7 +361,10 @@ export class MaterialContext {
     if (!mat) return null;
     prim.setMaterial(mat);
     if (layers > 1) {
-      const perLayer = await Promise.all(Array.from({ length: layers }, (_, i) => this.material(guid, { ...opts, layer: i })));
+      // Built one after another: concurrent builds would add textures in whatever order their image
+      // reads finish, which makes the output differ between runs.
+      const perLayer: (Material | null)[] = [];
+      for (let i = 0; i < layers; i++) perLayer.push(await this.material(guid, { ...opts, layer: i }));
       setVariants(this.doc, prim, perLayer, layers);
     }
     if (unity && !usesVertexColors(unity)) demoteVertexColors(prim);

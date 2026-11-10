@@ -1,5 +1,5 @@
-// glTF document helpers: I/O, input fingerprints and manifests, mesh import from AssetRipper's
-// `Mesh/*.glb`, skins from Unity bind poses, material variants, and the compress-and-write step.
+// glTF document helpers: I/O, input fingerprints and manifests, mesh import from Unity mesh YAML,
+// skins from Unity bind poses, material variants, and the compress-and-write step.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -11,11 +11,11 @@ import { MeshoptDecoder, MeshoptEncoder } from "meshoptimizer";
 import sharp from "sharp";
 import { force, modelsDir, skipOpt } from "./env";
 import { builtinMeshName, DecodedMesh, decodeBuiltinMesh, decodeMesh, UnsupportedMeshError } from "./meshes";
-import { MeshInfo } from "./unity";
+import { canonicalUnityYaml, MeshInfo } from "./unity";
 import { unityToGltfMatrix } from "./math";
 
 /** Bump after any code change that alters output, so unchanged inputs are rebuilt. */
-const PIPELINE_VERSION = "models-v3.0";
+const PIPELINE_VERSION = "models-v3.1";
 
 // libvips' operation cache and thread pool may exhaust native memory over a full run of WebP encodes.
 sharp.cache(false);
@@ -35,10 +35,13 @@ async function io(): Promise<NodeIO> {
 }
 
 const fileHashCache = new Map<string, string>();
+/** Content hash; Unity YAML is hashed in canonical form (see `canonicalUnityYaml`) so a fresh export of the same data hashes the same. */
 function hashFile(file: string): string {
   let h = fileHashCache.get(file);
   if (!h) {
-    h = crypto.createHash("sha1").update(fs.readFileSync(file)).digest("hex");
+    const bytes = fs.readFileSync(file);
+    const isYaml = bytes.subarray(0, 5).toString("latin1") === "%YAML";
+    h = crypto.createHash("sha1").update(isYaml ? canonicalUnityYaml(bytes.toString("utf8")) : bytes).digest("hex");
     fileHashCache.set(file, h);
   }
   return h;

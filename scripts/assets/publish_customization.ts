@@ -141,12 +141,12 @@ async function buildPart(job: Job, so: any): Promise<"built" | "empty" | "failed
     for (const [i, prim] of res.primitives.entries()) {
       if (i < clothingCount) {
         await assignMaterial(ctx, prim, refGuid(variants[0][i]), job.category);
-        const perVariant: (Material | null)[] = await Promise.all(
-          variants.map(async (v) => {
-            const g = refGuid(v[i]);
-            return g ? ctx.material(g, { runtime: await runtimeFlags(g, job.category) }) : null;
-          }),
-        );
+        // One after another so the output doesn't depend on which image read finishes first.
+        const perVariant: (Material | null)[] = [];
+        for (const v of variants) {
+          const g = refGuid(v[i]);
+          perVariant.push(g ? await ctx.material(g, { runtime: await runtimeFlags(g, job.category) }) : null);
+        }
         setVariants(part.doc, prim, perVariant, variants.length);
       } else if (showsSkin && i === clothingCount && firstBodyColorGuid) {
         await assignMaterial(ctx, prim, firstBodyColorGuid, job.category, ["bodyColor"]);

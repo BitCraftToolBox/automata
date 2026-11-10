@@ -195,7 +195,11 @@ columns after the first `active: false`. Stacking to arbitrary heights and `_top
   at 1024 px) and Meshopt. Nothing that joins, flattens, instances or palettes nodes/materials: the
   viewer relies on their names and extras.
 - **Fingerprints**: each output's inputs are the GUID closure of its YAML (assets, materials, shaders,
-  textures, meshes), the rig files for rigged parts, and `PIPELINE_VERSION`.
+  textures, meshes), the rig files for rigged parts, and `PIPELINE_VERSION`. AssetRipper makes up
+  new GUIDs and in-prefab object ids on every export, so YAML is hashed in canonical form
+  (`canonicalUnityYaml`: GUIDs masked, object ids renumbered by document order) and an unchanged
+  asset keeps its hash across runs. Builds are deterministic too: texture-array layers and material
+  variants are built one after another, never concurrently.
   Shader JSON is not hashed: bump `PIPELINE_VERSION` in `lib/gltf.ts` after any code change that
   alters output or after re-ripping with a new AssetRipper.
 - **Manifests** (`manifest_<kind>.json`, key → `{ file, inputs }`) skip unchanged outputs and are
