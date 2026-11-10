@@ -15,7 +15,7 @@ import { canonicalUnityYaml, MeshInfo } from "./unity";
 import { unityToGltfMatrix } from "./math";
 
 /** Bump after any code change that alters output, so unchanged inputs are rebuilt. */
-const PIPELINE_VERSION = "models-v3.1";
+const PIPELINE_VERSION = "models-v3.2";
 
 // libvips' operation cache and thread pool may exhaust native memory over a full run of WebP encodes.
 sharp.cache(false);

@@ -185,12 +185,13 @@ async function applyPrefab(doc: Document, prefab: Prefab, depth = 0): Promise<Pr
 
   // PrefabRandomizer { objectPrefabs[], objectWeights[] }: the prefab has no geometry of its own
   // and instantiates one weighted-random prefab at runtime. Every variant is inlined under a
-  // `RandomVariant_<i>` node; variants after the first are `active: false`.
+  // `RandomVariant_<i>` node; variants after the first are `active: false`. The component is
+  // recognized by those two fields: its script file isn't always among the exported scripts.
   for (const [go, node] of map) {
     for (const c of go.components) {
-      if (c.type !== "MonoBehaviour" || path.basename(refToPath(c.data.m_Script) ?? "") !== "PrefabRandomizer.cs") continue;
-      const prefabs: Ref[] = c.data.objectPrefabs ?? [];
-      const weights: number[] = c.data.objectWeights ?? [];
+      if (c.type !== "MonoBehaviour" || !Array.isArray(c.data.objectPrefabs) || !Array.isArray(c.data.objectWeights)) continue;
+      const prefabs: Ref[] = c.data.objectPrefabs;
+      const weights: number[] = c.data.objectWeights;
       for (const [i, ref] of prefabs.entries()) {
         const variantFile = refToPath(ref);
         const wrapper = depth > MAX_INLINE_DEPTH ? null : await inlinePrefab(doc, node, variantFile, `RandomVariant_${i}`, depth + 1, stats);
