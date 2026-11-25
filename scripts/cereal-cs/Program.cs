@@ -33,6 +33,19 @@ async Task Main()
         throw new Exception("Missing required environment variable BITCRAFT_SPACETIME_HOST.");
     }
 
+    // Grab the global schema in the same run as the region one so the two can't drift apart.
+    // Schema only: there's no static data in the global module that isn't in the region dump.
+    var globalModule = Environment.GetEnvironmentVariable("BITCRAFT_GLOBAL_MODULE");
+    if (string.IsNullOrEmpty(globalModule))
+    {
+        Console.WriteLine("BITCRAFT_GLOBAL_MODULE not set; skipping global_schema.json.");
+    }
+    else
+    {
+        var globalSchema = await DownloadSchema(host, globalModule);
+        File.WriteAllText(Path.Combine(dataDir, "global_schema.json"), globalSchema.ToString(Formatting.Indented));
+    }
+
     var tables = await GetStaticTableNames(host, region, dataDir);
 
     var staticDir = Path.Combine(dataDir, "static");
@@ -67,7 +80,7 @@ void ProcessThread(DbConnection conn, CancellationToken ct)
     }
 }
 
-async Task<Dictionary<string, string>> GetStaticTableNames(string host, string module, string dataDir)
+async Task<JObject> DownloadSchema(string host, string module)
 {
     using var client = new HttpClient();
     var response = await client.GetAsync($"https://{host}/v1/database/{module}/schema?version=9");
@@ -78,7 +91,7 @@ async Task<Dictionary<string, string>> GetStaticTableNames(string host, string m
 
     var content = await response.Content.ReadAsStringAsync();
     var schema = JsonConvert.DeserializeObject<JObject>(content);
-    if (schema == null || !schema.TryGetValue("tables", out var tableArray))
+    if (schema == null || !schema.ContainsKey("tables"))
     {
         throw new Exception("Invalid schema format: 'tables' field not found");
     }
@@ -89,6 +102,14 @@ async Task<Dictionary<string, string>> GetStaticTableNames(string host, string m
         var sorted = new JArray(rls.OrderBy(item => item["sql"]?.ToString()));
         schema["row_level_security"] = sorted;
     }
+
+    return schema;
+}
+
+async Task<Dictionary<string, string>> GetStaticTableNames(string host, string module, string dataDir)
+{
+    var schema = await DownloadSchema(host, module);
+    var tableArray = schema["tables"]!;
 
     var schemaPath = Path.Combine(dataDir, "region_schema.json");
     File.WriteAllText(schemaPath, schema.ToString(Formatting.Indented));
