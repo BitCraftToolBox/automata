@@ -68,6 +68,14 @@ tasks:
         # webhook_url: "https://discord.com/api/webhooks/.../data-channel"
       - type: github_dispatch
         workflow: "sats-json.yml"
+      # Run a local command (string = through the shell, list = exec). Succeeds on exit status 0.
+      # Output is logged; MAINSPRING_SOURCE / MAINSPRING_DESCRIPTION are set from the trigger context.
+      # Script actions sharing a `lock` (default "default") never run concurrently.
+      # - type: script
+      #   command: ["/opt/scripts/refresh.sh", "bindings"]
+      #   cwd: "/srv"            # optional
+      #   env: {FOO: "bar"}      # optional
+      #   timeout: 3600          # optional, seconds (0 = none)
   
   # Asset Monitor - checks Steam depot manifest
   asset_monitor:

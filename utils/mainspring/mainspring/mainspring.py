@@ -16,7 +16,7 @@ import aiohttp
 
 from .core import EventBus, Task, Action, Event, EventType
 from .tasks import SchemaMonitorTask, TableSubscriberTask, AssetMonitorTask, WorkflowMonitorTask
-from .actions import GitHubDispatchAction, DiscordWebhookAction, RestartTaskAction, LogAction
+from .actions import GitHubDispatchAction, DiscordWebhookAction, RestartTaskAction, LogAction, ScriptAction
 
 
 def _load_config(config_path: str) -> Dict[str, Any]:
@@ -103,6 +103,12 @@ class Mainspring:
             )
         elif action_type == "log":
             return LogAction(
+                name=action_name,
+                config=action_config,
+                event_bus=self.event_bus
+            )
+        elif action_type == "script":
+            return ScriptAction(
                 name=action_name,
                 config=action_config,
                 event_bus=self.event_bus
